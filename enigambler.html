@@ -294,16 +294,16 @@ async function loadDaily(){
   LIVE.days=((await r.json()).days||[]).map(d=>d.date);
   await pickDay();
 }
+// Load every saved set at once (about 1 MB when the archive is complete), so every game can draw from all of it.
 async function pickDay(){
-  if(!LIVE.days||!LIVE.days.length)return;
-  const date=LIVE.days[Math.floor(Math.random()*LIVE.days.length)];
-  const r=await fetch(`questions/${date}.json`);if(!r.ok)return;
-  const j=await r.json(), pool={e:[],m:[],h:[]};
-  (j.questions||[]).forEach(x=>{if(pool[x[1]])pool[x[1]].push([schoolOf(x[0]),...x.slice(1)])});
-  if(!j.questions||!j.questions.length)return;
-  LIVE.pool=pool;LIVE.on=true;LIVE.state="daily";LIVE.date=date;LIVE.count=j.questions.length;
+  if(!LIVE.days||!LIVE.days.length||LIVE.full)return;
+  const files=await Promise.all(LIVE.days.map(name=>fetch(`questions/${name}.json`).then(r=>r.ok?r.json():null).catch(()=>null)));
+  const pool={e:[],m:[],h:[]};let n=0;
+  files.forEach(j=>(j&&j.questions||[]).forEach(x=>{if(pool[x[1]]){pool[x[1]].push([schoolOf(x[0]),...x.slice(1)]);n++}}));
+  if(!n)return;
+  LIVE.pool=pool;LIVE.on=true;LIVE.state="daily";LIVE.count=n;LIVE.full=true;
 }
-const rollDay=()=>{if(LIVE.days&&LIVE.days.length>1)pickDay().catch(()=>{})};
+const rollDay=()=>{if(LIVE.days&&LIVE.days.length&&!LIVE.full)pickDay().catch(()=>{})};
 async function liveInit(){
   try{await loadDaily()}catch(e){}
   try{
@@ -315,7 +315,7 @@ async function liveInit(){
   if(!S)render();
 }
 function statusLine(){
-  if(LIVE.state==="daily")return `${(LIVE.days||[]).length} saved days · playing ${LIVE.date} (${LIVE.count} questions)`;
+  if(LIVE.state==="daily")return `Full archive loaded · ${LIVE.count.toLocaleString("en-US")} questions`;
   return {loading:"Gathering questions…",live:"Open Trivia DB · 4,000+ questions",offline:"Offline · built-in question bank"}[LIVE.state];
 }
 function topUp(){

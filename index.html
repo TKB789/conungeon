@@ -101,7 +101,7 @@ h1 em{font-style:normal;color:var(--torch)}
   </section>
 
   <footer class="foot">
-    <p id="qstat">Fresh questions are saved every day, so each new game draws from a random day.</p>
+    <p id="qstat">New questions are added to the archive every day, and every game draws from all of them.</p>
     <p>Questions from <a href="https://opentdb.com">Open Trivia DB</a> (CC BY-SA 4.0). Not affiliated with any board game or game show.</p>
   </footer>
 </main>
@@ -190,7 +190,7 @@ frame(0);if(!still)requestAnimationFrame(loop);
 fetch("questions/index.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{
   if(!j||!j.days||!j.days.length)return;
   const total=j.days.reduce((a,d)=>a+d.count,0);
-  document.getElementById("qstat").textContent=`${j.days.length} day${j.days.length>1?"s":""} of questions saved · ${total.toLocaleString("en-US")} questions in the archive. Each new game draws from a random day.`;
+  document.getElementById("qstat").textContent=`${total.toLocaleString("en-US")} questions in the archive, and every game draws from all of them.`;
 }).catch(()=>{});
 </script>
 </body>
