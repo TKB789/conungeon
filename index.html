@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conungeon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=VT323&family=Silkscreen&display=swap">
+<style>
+/* Layout: a pixel night scene (ghost town left, dungeon gate right) as the banner, then the title, then two signs: a stone dungeon door and a weathered saloon plank. Single committed dark look. */
+:root{
+  --night:#100d1c; --dusk:#1d1838; --ink:#efe6c8; --dim:#9d93b8;
+  --torch:#ffb03b; --ember:#ff6a2b; --ghost:#cfe0ff;
+  --stone:#3f3a4d; --stone-hi:#575069; --stone-lo:#2a2636;
+  --wood:#5a3a24; --wood-hi:#78502f; --wood-lo:#3c2516;
+  --pixel:"Pixelify Sans","Courier New",monospace;
+  --body:"VT323","Courier New",monospace;
+  --tiny:"Silkscreen","Courier New",monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--night);color:var(--ink)}
+body{font-family:var(--body);font-size:22px;line-height:1.25;padding-inline:16px;padding-block:16px 48px;min-height:100%}
+*{box-sizing:border-box}
+main{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+
+/* chunky pixel frame: notched corners via stepped shadows, no radius */
+.px{box-shadow:0 -4px 0 0 var(--f),0 4px 0 0 var(--f),-4px 0 0 0 var(--f),4px 0 0 0 var(--f),0 8px 0 0 #0008}
+.scene{--f:#05040a;display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges;background:var(--dusk);margin-top:4px}
+
+.eyebrow{font-family:var(--tiny);font-size:12px;letter-spacing:.06em;color:var(--dim);margin:0;text-transform:uppercase}
+h1{font-family:var(--pixel);font-weight:700;font-size:clamp(46px,13vw,96px);line-height:.95;margin:8px 0 0;letter-spacing:.01em;text-wrap:balance;
+  color:var(--ink);text-shadow:4px 4px 0 var(--ember),8px 8px 0 #05040a}
+h1 em{font-style:normal;color:var(--torch)}
+.lede{max-width:36ch;margin:14px 0 0;color:var(--ink)}
+
+.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:28px;padding-inline:4px}
+.game{display:flex;flex-direction:column;gap:12px;padding:22px 20px;text-decoration:none;color:var(--ink);transition:transform .12s steps(2)}
+.game:hover{transform:translateY(-4px)}
+.game:focus-visible{outline:4px dashed var(--torch);outline-offset:8px}
+/* stone wall: offset brick courses */
+.game.crypt{--f:#0b0a10;background-color:var(--stone);
+  background-image:
+    linear-gradient(var(--stone-lo) 2px,transparent 2px),
+    linear-gradient(90deg,var(--stone-lo) 2px,transparent 2px),
+    linear-gradient(90deg,var(--stone-lo) 2px,transparent 2px);
+  background-size:100% 20px,40px 40px,40px 40px;
+  background-position:0 0,0 0,20px 20px}
+.game.crypt .inner{background:#1a1722e6}
+/* weathered planks */
+.game.saloon{--f:#1c1009;background-color:var(--wood);
+  background-image:linear-gradient(var(--wood-lo) 3px,transparent 3px),linear-gradient(90deg,transparent 0 60%,var(--wood-hi) 60% 61%,transparent 61%);
+  background-size:100% 26px,170px 26px}
+.game.saloon .inner{background:#2a1a10e6}
+.inner{display:flex;flex-direction:column;gap:10px;padding:16px;margin:-4px}
+.tag{font-family:var(--tiny);font-size:11px;letter-spacing:.04em;color:var(--dim);text-transform:uppercase}
+.game h2{font-family:var(--pixel);font-weight:700;font-size:clamp(34px,9vw,44px);line-height:1;margin:0;text-shadow:3px 3px 0 #05040a}
+.crypt h2{color:var(--torch)} .saloon h2{color:#f3c34b}
+.game p{margin:0}
+.cast{display:flex;flex-wrap:wrap;gap:8px}
+.cast span{font-family:var(--tiny);font-size:11px;padding:3px 8px;background:#05040a;color:var(--ghost);text-transform:uppercase}
+.play{display:inline-flex;align-self:flex-start;gap:8px;align-items:center;margin-top:4px;font-family:var(--pixel);font-weight:700;font-size:20px;padding:8px 14px;background:var(--torch);color:#2a1300;--f:#05040a}
+.saloon .play{background:#f3c34b}
+.play::after{content:"";width:0;height:0;border-left:8px solid currentColor;border-top:6px solid transparent;border-bottom:6px solid transparent}
+.game:hover .play{background:#ffd27a}
+
+.foot{display:flex;flex-direction:column;gap:6px;font-size:19px;color:var(--dim);border-top:4px dotted var(--stone);padding-top:16px}
+.foot a{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<main>
+  <canvas class="scene px" id="scene" width="192" height="108" role="img" aria-label="Pixel art: a ghost town at night with ghosts drifting past, and a stone dungeon gate lit by two torches"></canvas>
+
+  <header>
+    <p class="eyebrow">Two riddle games · one cursed dungeon</p>
+    <h1>Conun<em>geon</em></h1>
+    <p class="lede">Every monster is a question. Every answer is a weapon. Some of them are a gamble.</p>
+  </header>
+
+  <section class="games" aria-label="Games">
+    <a class="game crypt px" href="necroracle.html">
+      <div class="inner">
+        <span class="tag">Roguelike · 13 floors, then endless</span>
+        <h2>Necroracle</h2>
+        <p>Descend thirteen floors to face a dead oracle, answering questions to fight everything in between. The deeper you go, the stranger the monsters.</p>
+        <div class="cast"><span>Skeleton</span><span>Mimic</span><span>Basilisk</span><span>Librarian Lich</span><span>The Necroracle</span></div>
+        <span class="play px">Enter the crypt</span>
+      </div>
+    </a>
+    <a class="game saloon px" href="enigambler.html">
+      <div class="inner">
+        <span class="tag">Wager RPG · explore the world</span>
+        <h2>Enigambler</h2>
+        <p>You wake with no memory in a peculiar town. Peculiar, because the townsfolk only speak in answers and wait for you to find the questions. Learn their ways, then wager your runes to conquer every conungeon in the world and win your memories back.</p>
+        <div class="cast"><span>Menagerie Pit</span><span>Buried Archive</span><span>Ink Catacombs</span><span>The Enigamble</span></div>
+        <span class="play px">Wake up</span>
+      </div>
+    </a>
+  </section>
+
+  <footer class="foot">
+    <p id="qstat">Fresh questions are saved every day, so each new game draws from a random day.</p>
+    <p>Questions from <a href="https://opentdb.com">Open Trivia DB</a> (CC BY-SA 4.0). Not affiliated with any board game or game show.</p>
+  </footer>
+</main>
+
+<script>
+// ---------- Pixel scene, drawn at 192×108 and scaled up crisp
+const cv=document.getElementById("scene"), g=cv.getContext("2d");
+const W=192,H=108,GROUND=92;
+const still=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const px=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x|0,y|0,w|0,h|0)};
+let seed=7;const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
+const stars=Array.from({length:46},()=>({x:rand()*W|0,y:rand()*58|0,p:rand()*6.28}));
+const GHOST=["..xxxxx..",".xxxxxxx.","xxoxxxoxx","xxoxxxoxx","xxxxxxxxx","xxxx.xxxx","xxxxxxxxx","xx.xxx.xx","x...x...x"];
+const ghosts=[{x:40,y:46,v:.12,ph:0},{x:110,y:36,v:.08,ph:2},{x:-20,y:56,v:.16,ph:4}];
+function sprite(rows,x,y,c,alpha){
+  g.globalAlpha=alpha;
+  rows.forEach((r,j)=>[...r].forEach((ch,i)=>{if(ch==="x")px(x+i,y+j,1,1,c);else if(ch==="o")px(x+i,y+j,1,1,"#1d1838")}));
+  g.globalAlpha=1;
+}
+function sky(){
+  const bands=["#0d0b1a","#120f22","#17132b","#1d1838","#251d44","#30234f","#3d2a56"];
+  bands.forEach((c,i)=>px(0,i*11,W,12,c));
+  // dither between bands
+  for(let i=1;i<bands.length;i++)for(let x=(i%2);x<W;x+=2)px(x,i*11,1,1,bands[i-1]);
+}
+function moon(){
+  const cx=150,cy=20,r=9;
+  for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(x*x+y*y<=r*r)px(cx+x,cy+y,1,1,"#efe6c8");
+  [[-3,-2,2],[2,3,3],[4,-4,1]].forEach(([x,y,s])=>px(cx+x,cy+y,s,s,"#cfc4a2"));
+}
+function hills(){
+  for(let x=0;x<W;x++){const h=70+Math.round(Math.sin(x/17)*4+Math.sin(x/7)*2);px(x,h,1,GROUND-h,"#211a35")}
+}
+function town(t){
+  const D="#0e0b18";
+  // saloon with false front and swinging sign
+  px(4,62,40,30,D);px(8,56,32,6,D);px(14,52,20,4,D);
+  px(10,72,6,8,"#1d1730");px(30,72,6,8,"#1d1730"); // dark windows
+  const lit=Math.sin(t/700)>-.3; if(lit)px(31,73,4,6,"#f2b33d"); // one window still lit
+  px(20,80,8,12,"#05040a"); // door
+  px(16,64,16,5,"#3c2516");px(17,65,14,3,"#5a3a24"); // sign plank
+  // shack, crooked
+  px(48,74,18,18,D);for(let i=0;i<10;i++)px(48+i,74-i*.5,18-i*2,1,D);px(54,80,5,7,"#1d1730");
+  // water tower
+  px(72,52,16,12,D);px(70,50,20,3,D);px(73,64,2,28,D);px(85,64,2,28,D);px(75,74,10,1,D);
+  // fence
+  for(let x=92;x<124;x+=5)px(x,84,2,8,D);px(92,86,32,1,D);
+}
+function gate(t){
+  const S="#3f3a4d",L="#2a2636",H="#575069";
+  px(132,54,52,38,S);
+  for(let y=54;y<GROUND;y+=5){const off=((y-54)/5)%2?0:4;for(let x=132+off;x<184;x+=8)px(x,y,1,5,L);px(132,y,52,1,L)}
+  px(132,54,52,1,H);
+  // arched doorway
+  const cx=158;for(let y=62;y<GROUND;y++){const dy=Math.max(0,70-y),w=Math.round(Math.sqrt(Math.max(0,81-dy*dy)));px(cx-w,y,w*2,1,"#05040a")}
+  // keystone and battlements
+  px(155,59,6,3,H);for(let x=132;x<184;x+=8)px(x,50,5,4,S);
+  // torches
+  [[138,68],[176,68]].forEach(([x,y],k)=>{
+    px(x,y,2,7,"#3c2516");
+    const f=still?1:(Math.sin(t/90+k*2)+Math.sin(t/37+k))*.5;
+    px(x-1,y-4,4,4,"#ff6a2b");px(x,y-5-(f>0?1:0),2,3,"#ffb03b");px(x,y-3,2,1,"#fff2b0");
+    g.globalAlpha=.10+.04*f;for(let r=8;r>2;r-=2)px(x-r+1,y-r-2,r*2,r*2,"#ffb03b");g.globalAlpha=1;
+  });
+}
+function ground(t){
+  px(0,GROUND,W,H-GROUND,"#1a1526");for(let x=0;x<W;x+=2)px(x+(x%4?1:0),GROUND,1,1,"#2a2238");
+  for(let x=3;x<W;x+=11)px(x,GROUND+4+(x%3),2,1,"#2a2238");
+  // tumbleweed
+  if(!still){const p=(t/40)%(W*3);if(p<W+10){const x=p-6,b=Math.abs(Math.sin(p/6))*3;px(x,GROUND-4-b,4,4,"#6b5a3a");px(x+1,GROUND-5-b,2,1,"#6b5a3a");px(x+1,GROUND-3-b,1,1,"#4a3d27")}}
+}
+function frame(t){
+  sky();
+  stars.forEach(s=>{const on=still||Math.sin(t/600+s.p)>-.4;if(on)px(s.x,s.y,1,1,Math.sin(t/900+s.p)>.6?"#ffffff":"#b9b0d6")});
+  moon();hills();town(t);gate(t);ground(t);
+  ghosts.forEach(o=>{
+    const x=still?o.x:((o.x+t*o.v/16)%(W+30))-15, y=o.y+(still?0:Math.round(Math.sin(t/500+o.ph)*2));
+    sprite(GHOST,x,y,"#cfe0ff",.78);
+  });
+}
+let last=0;
+function loop(t){if(t-last>80){frame(t);last=t}requestAnimationFrame(loop)}
+frame(0);if(!still)requestAnimationFrame(loop);
+
+// ---------- Archive count
+fetch("questions/index.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(j=>{
+  if(!j||!j.days||!j.days.length)return;
+  const total=j.days.reduce((a,d)=>a+d.count,0);
+  document.getElementById("qstat").textContent=`${j.days.length} day${j.days.length>1?"s":""} of questions saved · ${total.toLocaleString("en-US")} questions in the archive. Each new game draws from a random day.`;
+}).catch(()=>{});
+</script>
+</body>
+</html>
