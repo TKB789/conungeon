@@ -42,7 +42,16 @@ button:focus-visible{outline:2px solid var(--torch);outline-offset:2px}
 .hpline{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px}
 .floor{text-align:right}
 .floor b{font-family:var(--display);font-size:30px;color:var(--torch);font-weight:800}
-.kit{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.kit{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.kithead{display:flex;justify-content:space-between;gap:8px}
+.kithead .full{color:var(--blood)}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.slot{min-height:46px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 6px;font-size:13px;line-height:1.15;border:1px solid var(--mana);color:var(--mana);background:var(--stone);border-radius:6px;min-width:0;overflow-wrap:anywhere}
+button.slot:hover{background:var(--slab-2)}
+.slot.empty{border:1px dashed var(--line);color:var(--dim);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+.relics{display:flex;flex-wrap:wrap;gap:6px}
+.chip b{font-family:var(--mono);font-size:12px}
+.reward:disabled{opacity:.45;cursor:default}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:14px;background:var(--stone)}
 .chip.item{border-color:var(--mana);color:var(--mana)}
 button.chip.item:hover{background:var(--slab-2)}
@@ -50,10 +59,13 @@ button.chip.item:hover{background:var(--slab-2)}
 
 /* Rooms */
 .room{background:var(--slab);border:1px solid var(--line);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px}
-.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.door{background:var(--stone);border:1px solid var(--line);border-radius:60px 60px 6px 6px;padding:26px 12px 16px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;transition:border-color .15s,transform .15s}
+.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.doors .door.boss{grid-column:1/-1}
+.door small{line-height:1.3}
+.door{background:var(--stone);border:1px solid var(--line);border-radius:4px;padding:8px 8px 14px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;transition:border-color .15s,transform .15s}
 .door:hover{border-color:var(--torch);transform:translateY(-2px)}
-.door .glyph{font-family:var(--mono);font-size:30px;color:var(--torch)}
+.cave{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:64/44;image-rendering:pixelated;image-rendering:crisp-edges;border:3px solid #05040a;margin-bottom:4px}
+.door:hover .cave{border-color:var(--torch)}
 .door.elite .glyph{color:var(--blood)} .door.rest .glyph{color:var(--mana)} .door.treasure .glyph{color:var(--gold)}
 .door strong{font-size:18px}
 .door small{color:var(--dim);font-size:14px}
@@ -115,7 +127,7 @@ button.chip.item:hover{background:var(--slab-2)}
 .past summary{cursor:pointer;display:flex;gap:10px;flex-wrap:wrap;font-size:15px}
 .past summary span:first-child{font-family:var(--mono);font-size:12px;color:var(--dim);align-self:center}
 .past summary .muted{margin-left:auto}
-.scene{display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges;background:#1d1838;border:4px solid #05040a;box-shadow:0 6px 0 #0008}
+.scene{display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges;background:#0b0911;border:4px solid #05040a;box-shadow:0 6px 0 #0008}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -245,11 +257,13 @@ async function liveFetch(d){
   const dn={e:"easy",m:"medium",h:"hard"}[d];
   const r=await fetch(`${API}api.php?amount=50&type=multiple&difficulty=${dn}&encode=url3986${LIVE.token?"&token="+LIVE.token:""}`);
   const j=await r.json();
-  if(j.response_code===4&&LIVE.token){await fetch(`${API}api_token.php?command=reset&token=${LIVE.token}`);return}
+  if(j.response_code===4&&LIVE.token){LIVE.exhausted=LIVE.exhausted||{};LIVE.exhausted[d]=1;return}
   if(j.response_code!==0)return;
   const D=decodeURIComponent;
-  j.results.forEach(x=>LIVE.pool[d].push([schoolOf(D(x.category)),d,D(x.question),D(x.correct_answer),...x.incorrect_answers.map(D)]));
+  const have=new Set(LIVE.pool[d].map(q=>q[2]));
+  j.results.forEach(x=>{const q=D(x.question);if(!have.has(q))LIVE.pool[d].push([schoolOf(D(x.category)),d,q,D(x.correct_answer),...x.incorrect_answers.map(D)])});
   LIVE.on=true;if(LIVE.state!=="daily")LIVE.state="live";
+  try{localStorage.setItem("conungeon-live",JSON.stringify(LIVE.pool))}catch(e){}
 }
 // questions/index.json lists every saved day; the GitHub Action adds one file per day
 async function loadDaily(){
@@ -269,17 +283,34 @@ async function pickDay(){
 const rollDay=()=>{if(LIVE.days&&LIVE.days.length&&!LIVE.full)pickDay().catch(()=>{})};
 async function liveInit(){
   try{await loadDaily()}catch(e){}
-  try{
-    const r=await fetch(API+"api_token.php?command=request");const j=await r.json();
-    LIVE.token=j.token||null;LIVE.last=Date.now();
-    if(!LIVE.on)for(const d of "emh")await liveFetch(d);
-  }catch(e){}
+  // No archive on the site: use the live API, but keep what it gave us in this browser and keep
+  // fetching new batches in the background, so the question pool grows each visit instead of starting over.
+  if(!LIVE.on){
+    try{const c=JSON.parse(localStorage.getItem("conungeon-live")||"null");if(c&&c.e&&c.e.length){LIVE.pool=c;LIVE.on=true;LIVE.state="live"}}catch(e){}
+    try{
+      LIVE.token=localStorage.getItem("conungeon-token");
+      if(!LIVE.token){const r=await fetch(API+"api_token.php?command=request");const j=await r.json();LIVE.token=j.token||null;try{localStorage.setItem("conungeon-token",LIVE.token)}catch(e){}}
+      LIVE.last=Date.now()-5200;
+      if(!LIVE.on)for(const d of "emh")await liveFetch(d);
+      if(!S)render();
+      grow();
+    }catch(e){}
+  }
   if(!LIVE.on)LIVE.state="offline";
   if(!S)render();
 }
 function statusLine(){
   if(LIVE.state==="daily")return `Full archive loaded · ${LIVE.count.toLocaleString("en-US")} questions`;
-  return {loading:"Gathering questions…",live:"Open Trivia DB · 4,000+ questions",offline:"Offline · built-in question bank"}[LIVE.state];
+  return {loading:"Gathering questions…",live:`Live questions · ${(LIVE.pool.e.length+LIVE.pool.m.length+LIVE.pool.h.length).toLocaleString("en-US")} loaded so far`,offline:"Offline · built-in question bank"}[LIVE.state];
+}
+// Keep pulling new batches in the background (one request every ~6 seconds) until the API runs dry.
+async function grow(){
+  if(LIVE.state==="daily"||LIVE.growing)return;LIVE.growing=true;
+  for(let k=0;k<80;k++){
+    const d=[..."emh"].find(x=>!(LIVE.exhausted||{})[x]);if(!d)break;
+    try{await liveFetch(d)}catch(e){break}
+    if(!S)render();
+  }
 }
 function topUp(){
   if(!LIVE.on||LIVE.busy)return;
@@ -304,25 +335,26 @@ const TIERS=[
  [["Wraith","W","drains a little of your warmth"],["Minotaur","M","charges straight through you"],["Basilisk","B","holds your gaze one second too long"],["Banshee","b","wails the right answer, too late"],["Cursed Armor","A","clanks down on you, empty and angry"]],
  [["Bone Scholar","S","corrects you, painfully"],["Gorgon","N","turns your foot to stone for a moment"],["Ink Golem","I","smothers you in footnotes"],["Chimera","C","bites with all three heads"],["Shade","h","steps out of your own shadow"],["Candle Imp","i","singes your eyebrows"]]
 ];
-const FINAL=13;
+// No final floor: go as deep as you can. A boss every 5 floors.
 const tierFor=f=>f<=4?0:f<=8?1:f<=12?2:3;
-const BOSSES={5:["The Librarian Lich","L","hurls a very heavy tome"],10:["Wyrm of a Thousand Riddles","D","breathes riddle-fire"],13:["The Necroracle","Ø","foretold that wrong answer, and punishes it"]};
+const BOSSES={5:["The Librarian Lich","L","hurls a very heavy tome"],10:["Wyrm of a Thousand Riddles","D","breathes riddle-fire"]};
 const DEEP_BOSSES=[["The Bone Archivist","B","files you under Wrong"],["Hollow Oracle","O","foresaw that. It still hurts"],["Sphinx of Ash","X","pounces. Wrong answers are its favorite meal"],["Keeper of Lost Names","K","forgets your name, and some of your HP"]];
 // Bosses on floors 5, 10 and 13, then every 5 floors past 13
-const isBoss=f=>f===5||f===10||f===FINAL||(f>FINAL&&(f-FINAL)%5===0);
-const bossFor=f=>BOSSES[f]||DEEP_BOSSES[((f-FINAL)/5-1)%DEEP_BOSSES.length];
+const isBoss=f=>f%5===0;
+const bossFor=f=>BOSSES[f]||DEEP_BOSSES[(f/5-3)%DEEP_BOSSES.length];
+// Relics are passive and stack: take the same one twice and its effect doubles. They never use a pack slot.
 const RELICS=[
  {id:"quill",n:"Sharp Quill",d:"+3 damage on every hit"},
  {id:"tome",n:"Thick Tome",d:"+10 max HP and heal 10"},
- {id:"coin",n:"Lucky Coin",d:"Your first wrong answer each fight deals no damage"},
+ {id:"coin",n:"Lucky Coin",d:"Excuses 1 wrong answer per fight (up to 2)"},
  {id:"owl",n:"Owl Feather",d:"+6 seconds on every question"},
- {id:"ink",n:"Vampiric Ink",d:"Heal 2 HP on each correct answer"},
- {id:"ember",n:"Ember Gem",d:"Critical window grows from 6 to 10 seconds"},
- {id:"lens",n:"Scholar's Lens",d:"Weakness hits deal ×2.5 instead of ×2"},
- {id:"plate",n:"Iron Plate",d:"Take 2 less damage from every hit"}
+ {id:"ink",n:"Vampiric Ink",d:"Heal 2 HP on each correct answer (up to 6)"},
+ {id:"ember",n:"Ember Gem",d:"+4 seconds to the critical-hit window"},
+ {id:"lens",n:"Scholar's Lens",d:"+0.5× damage when hitting a weakness"},
+ {id:"plate",n:"Iron Plate",d:"Take 2 less damage from every hit (blocks up to 40% of a hit)"}
 ];
 const ITEMS=[
- {id:"potion",n:"Healing Draught",d:"Heal 12 HP",bt:false},
+ {id:"potion",n:"Healing Draught",d:"Heal 30% of max HP",bt:false},
  {id:"halve",n:"Scroll of Halving",d:"Remove two wrong answers",bt:true},
  {id:"glass",n:"Hourglass",d:"Add 15 seconds to the current question",bt:true},
  {id:"ward",n:"Ward Rune",d:"Block the next hit completely",bt:false}
@@ -336,7 +368,11 @@ const rnd=n=>Math.floor(Math.random()*n);
 const pick=a=>a[rnd(a.length)];
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const has=id=>S.relics.includes(id);
+const cnt=id=>S.relics.filter(x=>x===id).length;
+// Defensive relics stack, but with limits: armor blocks at most 40% of a hit, and at most 2 wrong answers are excused per fight.
+const blockOf=atk=>Math.min(2*cnt("plate"),Math.floor(atk*.4));
+const hitFor=e=>Math.max(1,e.atk-blockOf(e.atk));
+const has=id=>cnt(id)>0;
 function loadBest(){try{return +localStorage.getItem("rc-best")||0}catch(e){return 0}}
 function saveBest(v){try{localStorage.setItem("rc-best",v)}catch(e){}}
 
@@ -383,7 +419,7 @@ function getQuestion(cat){
 // ---------- Rooms
 function enterDoor(i){
   const t=S.doors[i].t;
-  if(t==="rest"){S.floorEvent="Rested at a campfire";const h=Math.ceil(S.maxHp*.4);S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You rest by a cold hearth and recover ${h} HP.`);S.screen="rest";render();return}
+  if(t==="rest"){S.screen="rest";render();return}
   if(t==="treasure"){S.floorEvent="Opened a reliquary";S.rewardOpts=offerRewards(2,true);S.screen="reward";S.rewardTitle="A dusty reliquary";S.rewardNote="Choose one relic to keep.";render();return}
   startFight(t);
 }
@@ -391,17 +427,18 @@ function startFight(t){
   const f=S.floor, boss=t==="boss", elite=t==="elite";
   const tier=tierFor(f), mix=tier===3&&Math.random()<.4?TIERS[2]:TIERS[tier];
   const [n,g,hit]=boss?bossFor(f):pick(mix);
-  let hp=10+f*5, atk=2+Math.ceil(f*.9);
+  // Monsters keep getting tougher the deeper you go, so every run has a natural limit.
+  let hp=10+f*6+Math.floor(f*f/5), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/40);
   if(elite){hp=Math.round(hp*1.5);atk+=2}
-  if(boss){hp=f===5?60:f===10?120:60+f*8;atk+=3}
+  if(boss){hp=f===5?60:f===10?120:Math.round(hp*2.2);atk+=3}
   const cats=shuffle(available());
-  S.enemy={n:(elite?"Elite ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coinUsed:false};
+  S.enemy={n:(elite?"Elite ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0};
   S.screen="battle";S.phase="choose";S.offer=shuffle(available()).slice(0,3);
   if(!S.offer.includes(S.enemy.weak)&&Math.random()<.5)S.offer[0]=S.enemy.weak;
   S.offer=shuffle(S.offer);
   S.log.unshift(`${S.enemy.n} ${S.enemy.boss?"rises to guard the floor":"blocks the way"}.`);render();
 }
-function chooseCat(c){topUp();S.q=getQuestion(c);S.phase="ask";S.tMax=BASE_TIME+(has("owl")?6:0);S.tLeft=S.tMax;render();startTimer()}
+function chooseCat(c){topUp();S.q=getQuestion(c);S.phase="ask";S.tMax=BASE_TIME+6*cnt("owl");S.tLeft=S.tMax;render();startTimer()}
 function startTimer(){
   stopTimer();const t0=performance.now(),start=S.tLeft;
   timerId=setInterval(()=>{
@@ -420,21 +457,21 @@ function answer(opt){
   const e=S.enemy, ok=opt===S.q.right, elapsed=S.tMax-S.tLeft;
   if(ok){
     S.correct++;S.streak++;S.bestStreak=Math.max(S.bestStreak,S.streak);
-    let dmg=S.power+(has("quill")?3:0), notes=[];
-    if(S.q.cat===e.weak){dmg*=has("lens")?2.5:2;notes.push("weakness")}
+    let dmg=S.power+3*cnt("quill"), notes=[];
+    if(S.q.cat===e.weak){dmg*=2+.5*cnt("lens");notes.push("weakness")}
     else if(S.q.cat===e.resist){dmg*=.5;notes.push("resisted")}
-    if(elapsed<=(has("ember")?10:6)){dmg*=1.5;notes.push("critical")}
+    if(elapsed<=6+4*cnt("ember")){dmg*=1.5;notes.push("critical")}
     if(S.streak>=3){dmg+=3;notes.push(`streak ${S.streak}`)}
     dmg=Math.round(dmg);e.hp=Math.max(0,e.hp-dmg);
-    if(has("ink"))S.hp=Math.min(S.maxHp,S.hp+2);
+    if(has("ink"))S.hp=Math.min(S.maxHp,S.hp+Math.min(6,2*cnt("ink")));
     S.log.unshift(`<span class="good">Correct.</span> You strike for ${dmg}${notes.length?" ("+notes.join(", ")+")":""}.`);
     S.hitFoe=true;
   }else{
     S.streak=0;S.missed.push({q:S.q.text,a:S.q.right});
     const why=opt===null?"Time runs out.":"Wrong.";
     if(S.ward){S.ward=false;S.log.unshift(`<span class="bad">${why}</span> Your Ward Rune absorbs the blow. The answer was ${esc(S.q.right)}.`)}
-    else if(has("coin")&&!e.coinUsed){e.coinUsed=true;S.log.unshift(`<span class="bad">${why}</span> The Lucky Coin spins and the blow misses. The answer was ${esc(S.q.right)}.`)}
-    else{const dmg=Math.max(1,e.atk-(has("plate")?2:0));S.hp=Math.max(0,S.hp-dmg);S.killer=e.n;S.log.unshift(`<span class="bad">${why}</span> ${esc(e.n)} ${esc(e.hit)}. −${dmg} HP. The answer was ${esc(S.q.right)}.`);S.hitMe=true}
+    else if((e.coins||0)<Math.min(2,cnt("coin"))){e.coins=(e.coins||0)+1;S.log.unshift(`<span class="bad">${why}</span> The Lucky Coin spins and the blow misses. The answer was ${esc(S.q.right)}.`)}
+    else{const dmg=hitFor(e);S.hp=Math.max(0,S.hp-dmg);S.killer=e.n;S.log.unshift(`<span class="bad">${why}</span> ${esc(e.n)} ${esc(e.hit)}. −${dmg} HP. The answer was ${esc(S.q.right)}.`);S.hitMe=true}
   }
   render();
 }
@@ -442,9 +479,10 @@ function nextTurn(){
   const e=S.enemy;
   if(S.hp<=0){endRun(false);return}
   if(e.hp<=0){
-    S.log.unshift(`${esc(e.n)} falls. You grow wiser: +1 power.`);S.power++;
+    // Growing tougher: monsters hit harder each floor, so each win raises your max HP too.
+    const gain=e.boss?8:e.elite?4:2;S.maxHp+=gain;S.hp=e.boss?S.maxHp:Math.min(S.maxHp,S.hp+gain);S.power++;
+    S.log.unshift(`${esc(e.n)} falls. +1 power, +${gain} max HP${e.boss?", and you're fully healed":""}.`);
     S.floorEvent=`Defeated ${e.n.replace(/^Elite /,"")}${e.boss?" (boss)":e.elite?" (elite)":""}`;
-    if(e.boss&&S.floor===FINAL&&!S.endless){endRun(true);return}
     S.rewardOpts=offerRewards(3,false);S.rewardTitle="Spoils";S.rewardNote="Take one.";S.screen="reward";render();return;
   }
   S.phase="choose";
@@ -453,7 +491,7 @@ function nextTurn(){
   S.offer=shuffle(o);render();
 }
 function offerRewards(n,relicOnly){
-  const relics=shuffle(RELICS.filter(r=>!has(r.id))).map(r=>({...r,kind:"relic"}));
+  const relics=shuffle(RELICS).map(r=>({...r,kind:"relic",owned:cnt(r.id)}));
   const items=shuffle(ITEMS).map(i=>({...i,kind:"item"}));
   if(relicOnly)return relics.length?relics.slice(0,n):items.slice(0,n);
   const out=[];if(relics.length&&Math.random()<.6)out.push(relics[0]);
@@ -461,8 +499,8 @@ function offerRewards(n,relicOnly){
 }
 function takeReward(i){
   const r=S.rewardOpts[i];
-  if(r.kind==="relic"){S.relics.push(r.id);if(r.id==="tome"){S.maxHp+=10;S.hp+=10}S.log.unshift(`You claim the ${r.n}.`)}
-  else{if(S.items.length<MAX_ITEMS){S.items.push(r.id);S.log.unshift(`You pocket a ${r.n}.`)}else S.log.unshift(`Your pack is full. You leave the ${r.n}.`)}
+  if(r.kind==="relic"){S.relics.push(r.id);if(r.id==="tome"){S.maxHp+=10;S.hp+=10}const k=cnt(r.id);S.log.unshift(k>1?`You claim another ${r.n}. Now ×${k}.`:`You claim the ${r.n}.`)}
+  else{if(S.items.length>=MAX_ITEMS)return;S.items.push(r.id);S.log.unshift(`You pocket a ${r.n}.`)}
   S.floorEvent+=` · took ${r.n}`;
   advance();
 }
@@ -470,7 +508,7 @@ function takeReward(i){
 function advance(){S.floorLog.push({f:S.floor,t:S.floorEvent||"Passed through"});S.floorEvent="";S.floor++;S.doors=makeDoors();S.screen="map";render()}
 function useItem(i){
   const id=S.items[i];
-  if(id==="potion"){if(S.hp>=S.maxHp)return;S.hp=Math.min(S.maxHp,S.hp+12);S.log.unshift("You drink a Healing Draught. +12 HP.")}
+  if(id==="potion"){if(S.hp>=S.maxHp)return;const h=Math.max(12,Math.round(S.maxHp*.3));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You drink a Healing Draught. +${h} HP.`)}
   else if(id==="ward"){if(S.ward)return;S.ward=true;S.log.unshift("A Ward Rune glows around you.")}
   else if(id==="halve"){if(S.screen!=="battle"||S.phase!=="ask")return;S.q.removed=S.q.opts.filter(o=>o!==S.q.right).slice(0,2);S.log.unshift("The scroll burns away two lies.")}
   else if(id==="glass"){if(S.screen!=="battle"||S.phase!=="ask")return;S.tMax+=15;S.tLeft+=15;startTimer();S.log.unshift("Sand flows backward. +15 seconds.")}
@@ -480,8 +518,8 @@ const RUNS_KEY="conungeon-runs";
 function loadRuns(){try{return JSON.parse(localStorage.getItem(RUNS_KEY)||"[]")}catch(e){return []}}
 function recordRun(win){
   const acc=S.asked?Math.round(S.correct/S.asked*100):0;
-  const last={f:S.floor,t:win?"Silenced the Necroracle":`Fell to ${S.killer||"the dark"}`,end:true};
-  const run={id:S.runId,date:new Date().toISOString().slice(0,10),floor:S.floor,won:win||S.endless,cleared:S.floorLog.length,acc,streak:S.bestStreak,log:[...S.floorLog,last]};
+  const last={f:S.floor,t:`Fell to ${S.killer||"the dark"}`,end:true};
+  const run={id:S.runId,date:new Date().toISOString().slice(0,10),floor:S.floor,cleared:S.floorLog.length,acc,streak:S.bestStreak,log:[...S.floorLog,last]};
   const runs=loadRuns().filter(r=>r.id!==run.id);runs.unshift(run);
   try{localStorage.setItem(RUNS_KEY,JSON.stringify(runs.slice(0,25)))}catch(e){}
 }
@@ -492,16 +530,22 @@ function endRun(win){
 }
 
 // ---------- Render
-const ROOM={fight:["x","Monster","A foe for your wits"],elite:["X","Elite","Harder questions, better spoils"],rest:["~","Campfire","Heal 40% of max HP"],treasure:["$","Reliquary","Claim a relic"],boss:["&","Boss","Guardian of the floor"]};
+const ROOM={fight:["x","Monster","A foe for your wits"],elite:["X","Elite","Harder questions, better spoils"],rest:["~","Campfire","Rest or train"],treasure:["$","Reliquary","Claim a relic"],boss:["&","Boss","Guardian of the floor"]};
 function hud(){
-  const items=S.items.map((id,i)=>{const it=ITEMS.find(x=>x.id===id);return `<button class="chip item" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}</button>`}).join("");
-  const relics=S.relics.map(id=>{const r=RELICS.find(x=>x.id===id);return `<span class="chip relic" title="${esc(r.d)}">${esc(r.n)}</span>`}).join("");
+  const full=S.items.length>=MAX_ITEMS;
+  const slots=Array.from({length:MAX_ITEMS},(_,i)=>{const id=S.items[i];if(!id)return `<span class="slot empty">Empty</span>`;
+    const it=ITEMS.find(x=>x.id===id);return `<button class="slot" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}</button>`}).join("");
+  const relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.d)}${k>1?` (×${k})`:""}">${esc(r.n)}${k>1?` <b>×${k}</b>`:""}</span>`}).join("");
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label">Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
       <div class="bar"><i style="width:${S.hp/S.maxHp*100}%"></i></div>
       <div class="label" style="margin-top:6px">Power ${S.power} · Streak ${S.streak}</div></div>
-    <div class="floor"><div class="label">Floor</div><b>${S.floor}</b>${S.endless?"":`<span class="muted num"> /${FINAL}</span>`}</div>
-    ${items||relics?`<div class="kit">${items}${relics}</div>`:`<div class="kit"><span class="muted" style="font-size:14px">No items or relics yet</span></div>`}
+    <div class="floor"><div class="label">Floor</div><b>${S.floor}</b></div>
+    <div class="kit">
+      <div class="kithead"><span class="label">Pack</span><span class="label ${full?"full":""}">${S.items.length} / ${MAX_ITEMS}${full?" · full":""}</span></div>
+      <div class="slots">${slots}</div>
+      ${relics?`<div class="kithead"><span class="label">Relics · passive, stack</span></div><div class="relics">${relics}</div>`:""}
+    </div>
   </div>`;
 }
 function logView(){return `<div class="log" aria-live="polite">${S.log.slice(0,5).map(l=>`<p>${l}</p>`).join("")}</div>`}
@@ -512,12 +556,16 @@ function render(){
   let body="";
   if(S.screen==="map"){
     body=`<section class="room"><div><p class="label">Floor ${S.floor}</p><h2>${isBoss(S.floor)?"A great door stands alone":"Choose a passage"}</h2></div>
-      <div class="doors">${S.doors.map((d,i)=>{const [g,n,s]=ROOM[d.t];return `<button class="door ${d.t}" data-a="door" data-i="${i}"><span class="glyph">${g}</span><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
+      <div class="doors">${S.doors.map((d,i)=>{const [g,n,s]=ROOM[d.t];return `<button class="door ${d.t}" data-a="door" data-i="${i}"><canvas class="cave" width="64" height="44" data-type="${d.t}" data-seed="${S.floor*7+i+1}" aria-hidden="true"></canvas><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
   }else if(S.screen==="rest"){
-    body=`<section class="room"><p class="label">Campfire</p><h2>You catch your breath</h2><p class="muted">Health restored. The stairs lead down.</p><div><button class="btn" data-a="advance">Descend to floor ${S.floor+1}</button></div></section>`;
+    const h=Math.min(S.maxHp-S.hp,Math.ceil(S.maxHp*.4));
+    body=`<section class="room"><p class="label">Campfire</p><h2>A moment by the fire</h2><p class="muted">Choose one, then descend.</p>
+      <div class="rewards"><button class="reward" data-a="rest" data-v="heal"><span class="label">Rest</span><strong>Heal ${h} HP</strong><span class="muted">Recover 40% of your max HP.</span></button>
+      <button class="reward it" data-a="rest" data-v="train"><span class="label">Train</span><strong>+8 max HP</strong><span class="muted">Grow tougher for the floors below. Also heals 8.</span></button></div></section>`;
   }else if(S.screen==="reward"){
     body=`<section class="room"><p class="label">${esc(S.rewardNote)}</p><h2>${esc(S.rewardTitle)}</h2>
-      <div class="rewards">${S.rewardOpts.map((r,i)=>`<button class="reward ${r.kind==="item"?"it":""}" data-a="reward" data-i="${i}"><span class="label">${r.kind==="relic"?"Relic · passive":"Item · single use"}</span><strong>${esc(r.n)}</strong><span class="muted">${esc(r.d)}</span></button>`).join("")}</div>
+      <div class="rewards">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&S.items.length>=MAX_ITEMS;
+        return `<button class="reward ${r.kind==="item"?"it":""}" data-a="reward" data-i="${i}" ${full?"disabled":""}><span class="label">${r.kind==="relic"?(r.owned?`Relic · stacks · you have ×${r.owned}`:"Relic · passive · stacks"):full?"Item · pack full":"Item · single use"}</span><strong>${esc(r.n)}</strong><span class="muted">${esc(r.d)}${full?". Use an item first to make room.":""}</span></button>`}).join("")}</div>
       <div><button class="btn ghost" data-a="advance">Take nothing</button></div></section>`;
   }else if(S.screen==="battle"){
     const e=S.enemy;
@@ -536,117 +584,175 @@ function render(){
     body=`<section class="room">
       <div class="foe${S.hitFoe?" shake":""}"><div class="sigil ${e.boss?"boss":""}" aria-hidden="true">${e.g}</div>
         <div class="foe-body"><div class="foe-name">${esc(e.n)}</div>
-          <div class="hpline" style="margin:0"><span class="label">Hits for ${Math.max(1,e.atk-(has("plate")?2:0))}</span><span class="num">${e.hp} / ${e.max}</span></div>
+          <div class="hpline" style="margin:0"><span class="label">Hits for ${hitFor(e)}</span><span class="num">${e.hp} / ${e.max}</span></div>
           <div class="bar"><i style="width:${e.hp/e.max*100}%"></i></div>
           <div class="traits"><span class="weak">Weak to ${e.weak}</span><span class="resist">· Resists ${e.resist}</span></div></div></div>
       ${mid}</section>`;
   }else{
     const win=S.screen==="win", acc=S.asked?Math.round(S.correct/S.asked*100):0;
-    body=`<section class="room title"><p class="label">${win?"The crypt is silent":"Your torch goes out"}</p><h2>${win?"The Necroracle is silenced":`Fallen on floor ${S.floor}`}</h2>
-      <p class="muted">${win?"The dead oracle has no more questions. Below its throne, the crypt keeps going: endless floors, stranger monsters, a boss every five.":`Slain by ${esc(S.killer||"the dark")}. The crypt keeps your bones and your unanswered questions.`}</p>
+    body=`<section class="room title"><p class="label">Your torch goes out</p><h2>Fallen on floor ${S.floor}</h2>
+      <p class="muted">Slain by ${esc(S.killer||"the dark")}. The crypt keeps your bones and your unanswered questions.${S.floor>=S.best&&S.floor>1?" A new deepest descent!":""}</p>
       <div class="stats" style="width:100%"><div><span class="label">Accuracy</span><span class="num">${acc}%</span></div><div><span class="label">Best streak</span><span class="num">${S.bestStreak}</span></div><div><span class="label">Deepest</span><span class="num">${S.best}</span></div></div>
-      <div style="width:100%"><p class="label">This descent · ${S.floorLog.length} floor${S.floorLog.length===1?"":"s"} cleared</p>${floorList([...S.floorLog,{f:S.floor,t:win?"Silenced the Necroracle":`Fell to ${S.killer||"the dark"}`,end:true}])}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${win?`<button class="btn" data-a="endless">Keep descending</button><button class="btn ghost" data-a="start">Start over</button>`:`<button class="btn" data-a="start">Descend again</button>`}</div></section>
+      <div style="width:100%"><p class="label">This descent · ${S.floorLog.length} floor${S.floorLog.length===1?"":"s"} cleared</p>${floorList([...S.floorLog,{f:S.floor,t:`Fell to ${S.killer||"the dark"}`,end:true}])}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-a="start">Descend again</button><button class="btn ghost" data-a="menu">Main menu</button></div></section>
       ${S.missed.length?`<section class="room"><div><p class="label">Study these</p><h2>What you missed</h2></div><div class="review">${S.missed.slice(-15).reverse().map(m=>`<div><p>${esc(m.q)}</p><p class="good">${esc(m.a)}</p></div>`).join("")}</div></section>`:""}`;
   }
   app.innerHTML=`<header><p class="label">Conungeon</p></header>`+hud()+body+logView();
+  drawDoors(performance.now());
   S.hitFoe=S.hitMe=false;
   const nb=$("#nextbtn");if(nb)nb.focus();
 }
-// ---------- Pixel scene on the title screen, drawn at 192×108 and scaled up crisp
+// ---------- Pixel scene on the title screen: a cavern with a dungeon stair, drawn at 192×108 and scaled up crisp
 let g=null;
-const W=192,H=108,GROUND=92;
+const W=192,H=108,FLOOR=92;
 const still=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const px=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x|0,y|0,w|0,h|0)};
 let seed=7;const rand=()=>(seed=(seed*16807)%2147483647)/2147483647;
-const stars=Array.from({length:46},()=>({x:rand()*W|0,y:rand()*58|0,p:rand()*6.28}));
-const GHOST=["..xxxxx..",".xxxxxxx.","xxoxxxoxx","xxoxxxoxx","xxxxxxxxx","xxxx.xxxx","xxxxxxxxx","xx.xxx.xx","x...x...x"];
-const ghosts=[{x:40,y:46,v:.12,ph:0},{x:110,y:36,v:.08,ph:2},{x:-20,y:56,v:.16,ph:4}];
-function sprite(rows,x,y,c,alpha){
-  g.globalAlpha=alpha;
-  rows.forEach((r,j)=>[...r].forEach((ch,i)=>{if(ch==="x")px(x+i,y+j,1,1,c);else if(ch==="o")px(x+i,y+j,1,1,"#1d1838")}));
-  g.globalAlpha=1;
-}
-function sky(){
-  const bands=["#0d0b1a","#120f22","#17132b","#1d1838","#251d44","#30234f","#3d2a56"];
-  bands.forEach((c,i)=>px(0,i*11,W,12,c));
-  // dither between bands
-  for(let i=1;i<bands.length;i++)for(let x=(i%2);x<W;x+=2)px(x,i*11,1,1,bands[i-1]);
-}
-function moon(){
-  const cx=150,cy=20,r=9;
-  for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(x*x+y*y<=r*r)px(cx+x,cy+y,1,1,"#efe6c8");
-  [[-3,-2,2],[2,3,3],[4,-4,1]].forEach(([x,y,s])=>px(cx+x,cy+y,s,s,"#cfc4a2"));
-}
-function hills(){
-  for(let x=0;x<W;x++){const h=70+Math.round(Math.sin(x/17)*4+Math.sin(x/7)*2);px(x,h,1,GROUND-h,"#211a35")}
-}
-function town(t){
-  const D="#0e0b18";
-  // saloon with false front and swinging sign
-  px(4,62,40,30,D);px(8,56,32,6,D);px(14,52,20,4,D);
-  px(10,72,6,8,"#1d1730");px(30,72,6,8,"#1d1730"); // dark windows
-  const lit=Math.sin(t/700)>-.3; if(lit)px(31,73,4,6,"#f2b33d"); // one window still lit
-  px(20,80,8,12,"#05040a"); // door
-  px(16,64,16,5,"#3c2516");px(17,65,14,3,"#5a3a24"); // sign plank
-  // shack, crooked
-  px(48,74,18,18,D);for(let i=0;i<10;i++)px(48+i,74-i*.5,18-i*2,1,D);px(54,80,5,7,"#1d1730");
-  // water tower
-  px(72,52,16,12,D);px(70,50,20,3,D);px(73,64,2,28,D);px(85,64,2,28,D);px(75,74,10,1,D);
-  // fence
-  for(let x=92;x<124;x+=5)px(x,84,2,8,D);px(92,86,32,1,D);
-}
-function gate(t){
-  const S="#3f3a4d",L="#2a2636",H="#575069";
-  px(132,54,52,38,S);
-  for(let y=54;y<GROUND;y+=5){const off=((y-54)/5)%2?0:4;for(let x=132+off;x<184;x+=8)px(x,y,1,5,L);px(132,y,52,1,L)}
-  px(132,54,52,1,H);
-  // arched doorway
-  const cx=158;for(let y=62;y<GROUND;y++){const dy=Math.max(0,70-y),w=Math.round(Math.sqrt(Math.max(0,81-dy*dy)));px(cx-w,y,w*2,1,"#05040a")}
-  // keystone and battlements
-  px(155,59,6,3,H);for(let x=132;x<184;x+=8)px(x,50,5,4,S);
-  // torches
-  [[138,68],[176,68]].forEach(([x,y],k)=>{
-    px(x,y,2,7,"#3c2516");
-    const f=still?1:(Math.sin(t/90+k*2)+Math.sin(t/37+k))*.5;
-    px(x-1,y-4,4,4,"#ff6a2b");px(x,y-5-(f>0?1:0),2,3,"#ffb03b");px(x,y-3,2,1,"#fff2b0");
-    g.globalAlpha=.10+.04*f;for(let r=8;r>2;r-=2)px(x-r+1,y-r-2,r*2,r*2,"#ffb03b");g.globalAlpha=1;
-  });
-}
-function ground(t){
-  px(0,GROUND,W,H-GROUND,"#1a1526");for(let x=0;x<W;x+=2)px(x+(x%4?1:0),GROUND,1,1,"#2a2238");
-  for(let x=3;x<W;x+=11)px(x,GROUND+4+(x%3),2,1,"#2a2238");
-  // tumbleweed
-  if(!still){const p=(t/40)%(W*3);if(p<W+10){const x=p-6,b=Math.abs(Math.sin(p/6))*3;px(x,GROUND-4-b,4,4,"#6b5a3a");px(x+1,GROUND-5-b,2,1,"#6b5a3a");px(x+1,GROUND-3-b,1,1,"#4a3d27")}}
+// soft pixel glow: solid core, checkerboard dither at the edge
+function pglow(gx,gy,rad,col,a){g.fillStyle=col;for(let y=Math.floor(gy-rad);y<=gy+rad;y++)for(let x=Math.floor(gx-rad);x<=gx+rad;x++){
+  const d=Math.hypot(x-gx,y-gy);if(d>rad)continue;if(d<rad*.5){g.globalAlpha=a;g.fillRect(x,y,1,1)}else if((x+y)%2===0){g.globalAlpha=a*.6;g.fillRect(x,y,1,1)}}g.globalAlpha=1}
+// The rock never changes, so it is drawn once into a hidden canvas and copied each frame.
+let BG=null;
+const CEIL=Array.from({length:W},(_,x)=>8+Math.round(Math.sin(x/9)*3+Math.sin(x/4.3)*1.5));
+const DRIPS=[[22,0],[61,1.7],[133,.8],[171,2.6]].map(([x,o])=>({x,o,y0:CEIL[x]+9}));
+function buildBG(){
+  BG=document.createElement("canvas");BG.width=W;BG.height=H;const keep=g;g=BG.getContext("2d");seed=7;
+  // deep cavern air
+  ["#0b0911","#0e0b16","#120e1c","#161122","#1a1427"].forEach((c,i)=>px(0,i*22,W,23,c));
+  // back wall texture
+  for(let i=0;i<260;i++)px(rand()*W,14+rand()*78,2+rand()*5,1+rand()*2,rand()<.5?"#1d1729":"#100c18");
+  // side walls closing in like a tunnel
+  for(let y=0;y<FLOOR;y++){const l=Math.round(30+Math.sin(y/7)*5-y*.12+(rand()*2|0)),r=Math.round(W-28-Math.sin(y/6+1)*5+y*.1-(rand()*2|0));
+    px(0,y,l,1,"#231c33");px(l-1,y,1,1,"#3a3150");px(r,y,W-r,1,"#231c33");px(r,y,1,1,"#332a47")}
+  for(let i=0;i<120;i++){const left=rand()<.5,x=left?rand()*26:W-rand()*24;px(x,rand()*FLOOR,2+rand()*3,1,rand()<.5?"#2e2642":"#1a1426")}
+  // a dark tunnel in the left wall (something lives there)
+  for(let y=58;y<FLOOR;y++){const w=Math.round(Math.sqrt(Math.max(0,100-(Math.max(0,68-y))**2)));px(16-w/2,y,w,1,"#050409")}
+  // ceiling and stalactites
+  for(let x=0;x<W;x++){px(x,0,1,CEIL[x],"#2a2238");px(x,CEIL[x],1,1,"#3d3352")}
+  for(let x=4;x<W;x+=5+(rand()*7|0)){const len=3+(rand()*12|0),y0=CEIL[x];for(let k=0;k<len;k++){const w=Math.max(1,3-Math.floor(k/(len/3)));px(x-(w>>1),y0+k,w,1,k<2?"#3d3352":"#2a2238")}}
+  // stone doorway carved into the back wall
+  const dx=96,top=42;
+  for(let y=top-6;y<FLOOR;y++){const half=y<top+6?Math.round(Math.sqrt(Math.max(0,22*22-(top+6-y)**2*4))):22;px(dx-half,y,half*2,1,"#3f3a4d")}
+  for(let y=top-6;y<FLOOR;y+=5){const off=((y-top)/5|0)%2?0:4;for(let x=dx-22+off;x<dx+22;x+=8)px(x,y,1,5,"#2a2636");px(dx-22,y,44,1,"#2a2636")}
+  for(let y=top;y<FLOOR;y++){const half=y<top+8?Math.round(Math.sqrt(Math.max(0,14*14-(top+8-y)**2*2.2))):14;px(dx-half,y,half*2,1,"#050409")}
+  px(dx-3,top-6,6,4,"#575069");px(dx-2,top-5,4,2,"#3f3a4d"); // keystone
+  // stairs going down into the dark
+  for(let k=0;k<7;k++){const y=FLOOR-1-k*4,w=26-k*3,c=["#3f3a4d","#363044","#2d283a","#241f2f","#1b1724","#13101a","#0c0a11"][k];px(dx-w/2,y,w,2,c);px(dx-w/2,y+2,w,2,"#050409")}
+  // cave floor
+  for(let x=0;x<W;x++){const h=FLOOR+Math.round(Math.sin(x/11)*1.5);px(x,h,1,H-h,"#1a1526");px(x,h,1,1,"#2c2440")}
+  for(let i=0;i<40;i++)px(rand()*W,FLOOR+3+rand()*12,1+rand()*3,1,rand()<.5?"#2c2440":"#120e1b");
+  // rock ledge on the left for the potions
+  px(26,74,36,4,"#3a3150");px(26,74,36,1,"#4e4366");px(28,78,32,2,"#231c33");
+  // pedestal on the right for the relic
+  px(148,80,12,12,"#3f3a4d");px(146,78,16,3,"#575069");px(147,90,14,2,"#2a2636");px(150,83,8,1,"#2a2636");
+  // crystal clusters in the walls
+  [[9,30],[180,48],[170,22]].forEach(([x,y])=>{px(x,y,2,5,"#2f8fa8");px(x+2,y+2,2,3,"#2a7b92");px(x-2,y+3,2,2,"#2a7b92");px(x,y,1,2,"#7fe0f0")});
+  // bones and pebbles on the floor
+  px(120,98,6,1,"#8f876e");px(121,97,1,1,"#8f876e");px(125,99,1,1,"#8f876e");px(40,100,3,2,"#a39a7e");px(40,100,1,1,"#2a2238");px(42,100,1,1,"#2a2238");
+  g=keep;
 }
 function frame(t){
-  const cv=document.getElementById("scene");if(!cv){g=null;return}g=cv.getContext("2d");
-  sky();
-  stars.forEach(s=>{const on=still||Math.sin(t/600+s.p)>-.4;if(on)px(s.x,s.y,1,1,Math.sin(t/900+s.p)>.6?"#ffffff":"#b9b0d6")});
-  moon();hills();town(t);gate(t);ground(t);
-  ghosts.forEach(o=>{
-    const x=still?o.x:((o.x+t*o.v/16)%(W+30))-15, y=o.y+(still?0:Math.round(Math.sin(t/500+o.ph)*2));
-    sprite(GHOST,x,y,"#cfe0ff",.78);
-  });
+  const cv=document.getElementById("scene");if(!cv){g=null;return}
+  if(!BG)buildBG();g=cv.getContext("2d");g.drawImage(BG,0,0);
+  const T=still?0:t, dx=96;
+  // torches beside the doorway
+  [[dx-30,62],[dx+28,62]].forEach(([x,y],k)=>{const f=still?0:Math.sin(T/90+k*2)+Math.sin(T/37+k);
+    pglow(x+1,y-3,11+(f>0?1:0),"#ffb03b",.12);px(x,y,2,8,"#3c2516");px(x-1,y-3,4,3,"#ff6a2b");px(x,y-5-(f>0?1:0),2,3,"#ffb03b");px(x,y-3,2,1,"#fff2b0")});
+  // potions on the ledge
+  [[31,"#e0473b"],[39,"#4b7bff"],[47,"#3fc77a"],[54,"#c25bff"]].forEach(([x,c],k)=>{
+    pglow(x+1.5,70,4,c,.14+(still?0:.06*Math.sin(T/400+k)));
+    px(x,69,4,5,c);px(x+1,67,2,2,"#9d93b8");px(x+1,66,2,1,"#8a5a34");px(x,69,1,2,"#f4f0ff");px(x+3,72,1,2,"#1a1426")});
+  // the relic: a gem on the pedestal, slowly pulsing
+  const pu=still?.5:(Math.sin(T/500)+1)/2;
+  pglow(154,73,9+pu*2,"#ffd25a",.14+.08*pu);
+  px(152,72,5,5,"#ffd25a");px(153,71,3,7,"#ffd25a");px(151,73,7,3,"#ffd25a");px(153,73,3,3,"#ff9a3a");px(153,72,1,1,"#fff6c8");
+  const tw=(T/220)%7;if(!still&&tw<1)px(159,69,1,1,"#fff6c8");else if(!still&&tw<2)px(149,70,1,1,"#fff6c8");
+  // crystals shimmer
+  [[9,30],[180,48],[170,22]].forEach(([x,y],k)=>{if(still||Math.sin(T/350+k*2)>.6){pglow(x+1,y+2,4,"#7fe0f0",.15);px(x,y,1,2,"#d8fbff")}});
+  // eyes in the dark: never more than eyes
+  const eyes=[{x:13,y:72,c:"#ffd25a",o:0},{x:dx-3,y:52,c:"#ff4a3a",o:2.1},{x:170,y:34,c:"#7fe08a",o:4.3},{x:184,y:80,c:"#c9a8ff",o:6.7}];
+  eyes.forEach(e=>{const cyc=(T/1000+e.o)%9;if(!still&&(cyc>7.6||(cyc>3&&cyc<3.15)))return;
+    const shift=!still&&cyc>5&&cyc<7.6?1:0;pglow(e.x+2+shift,e.y,3,e.c,.15);px(e.x+shift,e.y,1,1,e.c);px(e.x+3+shift,e.y,1,1,e.c)});
+  // water dripping from stalactites
+  if(!still)DRIPS.forEach(d=>{const p=((T/1000+d.o)%3.2)/3.2,fall=p*p*(FLOOR-d.y0)*1.0;
+    if(p<.92)px(d.x,d.y0+fall,1,2,"#6fa8c8");else{const s=(p-.92)/.08;px(d.x-1-s*2,FLOOR-1,1,1,"#6fa8c8");px(d.x+1+s*2,FLOOR-1,1,1,"#6fa8c8")}});
 }
 let last=0;
-function loop(t){if(t-last>80){frame(t);last=t}requestAnimationFrame(loop)}
+function loop(t){if(t-last>80){frame(t);drawDoors(t);last=t}requestAnimationFrame(loop)}
 if(!still)requestAnimationFrame(loop);
 
 function pastRuns(){
   const runs=loadRuns().slice(0,5);if(!runs.length)return "";
-  return `<div class="past"><p class="label">Past descents</p>${runs.map(r=>`<details><summary><span>${r.date}</span><span>${r.won?"Beat the Necroracle":`Fell on floor ${r.floor}`}${r.won&&r.floor>FINAL?`, then reached floor ${r.floor}`:""}</span><span class="muted">${r.acc}%</span></summary>${floorList(r.log)}</details>`).join("")}</div>`;
+  return `<div class="past"><p class="label">Past descents</p>${runs.map(r=>`<details><summary><span>${r.date}</span><span>Reached floor ${r.floor}</span><span class="muted">${r.acc}%</span></summary>${floorList(r.log)}</details>`).join("")}</div>`;
 }
+// ---------- Pixel cave entrances on the map (64×44, scaled up crisp)
+function seeded(k){return ()=>(k=(k*16807)%2147483647)/2147483647}
+function drawCave(cv,t){
+  const c=cv.getContext("2d"),type=cv.dataset.type,seed=+cv.dataset.seed||7,r=seeded(seed*97+13);
+  const P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0)};
+  const W=64,H=44,FY=37,cx=32,boss=type==="boss",mw=boss?17:13,top=boss?9:13;
+  // rock face
+  P(0,0,W,H,"#2a2636");
+  for(let i=0;i<90;i++)P(r()*W,r()*FY,2+r()*4,1+r()*2,r()<.55?"#3f3a4d":"#1f1b29");
+  for(let i=0;i<14;i++)P(r()*W,r()*FY,1,1,"#575069");
+  // ground
+  P(0,FY,W,H-FY,"#1a1526");for(let x=0;x<W;x+=3)P(x+(r()*2|0),FY,1,1,"#2a2238");
+  for(let i=0;i<6;i++)P(r()*W,FY+2+r()*4,2,1,"#3f3a4d");
+  // cave mouth: a rough arch with a lit rim
+  const edge={};
+  for(let y=top;y<FY;y++){const dy=Math.max(0,top+mw-y),w=Math.round(Math.sqrt(Math.max(0,mw*mw-dy*dy)))+(r()<.3?1:0);edge[y]=w}
+  Object.entries(edge).forEach(([y,w])=>{y=+y;P(cx-w-1,y,1,1,"#6b6380");P(cx+w,y,1,1,"#4a4458");P(cx-w,y,w*2,1,"#08070d")});
+  const inMouth=(x,y)=>edge[y]!==undefined&&x>=cx-edge[y]&&x<cx+edge[y];
+  // soft pixel glow: solid core, checkerboard dither at the edge
+  const glow=(gx,gy,rad,col,a,clip)=>{c.fillStyle=col;for(let y=Math.floor(gy-rad);y<=gy+rad;y++)for(let x=Math.floor(gx-rad);x<=gx+rad;x++){
+    const d=Math.hypot(x-gx,y-gy);if(d>rad||(clip&&!inMouth(x,y)))continue;
+    if(d<rad*.55){c.globalAlpha=a;c.fillRect(x,y,1,1)}else if((x+y)%2===0){c.globalAlpha=a*.7;c.fillRect(x,y,1,1)}}c.globalAlpha=1};
+  // stalactites hanging from the top of the mouth
+  for(let x=cx-mw+4;x<cx+mw-3;x+=3+(r()*3|0)){const len=1+(r()*4|0),y0=top+Math.max(0,mw-Math.round(Math.sqrt(Math.max(0,mw*mw-(x-cx)*(x-cx)))));for(let k=0;k<len;k++)P(x,y0+k,k<len-1?2:1,1,"#2a2636")}
+  // stalagmites on the floor
+  for(let x=cx-mw+3;x<cx+mw-2;x+=5+(r()*4|0)){const len=1+(r()*3|0);for(let k=0;k<len;k++)P(x,FY-1-k,k?1:2,1,"#1f1b29")}
+  const blink=still?false:((t/1000+seed*.37)%5)<.15;
+  if(type==="fight"){
+    if(!blink){P(cx-4,FY-11,2,1,"#ffd25a");P(cx+3,FY-11,2,1,"#ffd25a")}
+    P(cx-10,FY-1,4,1,"#cfc4a2");P(cx-9,FY-2,1,1,"#cfc4a2"); // a bone
+  }else if(type==="elite"){
+    // claw marks and red eyes
+    for(let k=0;k<3;k++)for(let y=0;y<6;y++)P(cx+mw+3+k*2+(y>>1),top+6+y,1,1,"#140f1c");
+    const pulse=still?.5:(Math.sin(t/300+seed)+1)/2;
+    if(!blink){glow(cx-4,FY-12,3.5,"#ff3a2a",.18+.2*pulse,true);glow(cx+4,FY-12,3.5,"#ff3a2a",.18+.2*pulse,true);
+      P(cx-5,FY-13,2,2,"#ff5a3a");P(cx+3,FY-13,2,2,"#ff5a3a");P(cx-5,FY-13,1,1,"#ffd0b0");P(cx+3,FY-13,1,1,"#ffd0b0")}
+    P(cx-12,FY-3,3,2,"#e8dfc4");P(cx-12,FY-1,1,1,"#e8dfc4");P(cx-10,FY-1,1,1,"#e8dfc4"); // skull
+  }else if(type==="rest"){
+    const f=still?0:Math.sin(t/90+seed)+Math.sin(t/37);
+    glow(cx,FY-5,11+(f>0?1:0),"#ff9a3a",.22,true);
+    P(cx-5,FY-1,10,1,"#5a3a24");P(cx-4,FY-2,8,1,"#78502f"); // logs
+    P(cx-3,FY-5,6,3,"#ff6a2b");P(cx-2,FY-7-(f>0?1:0),4,3,"#ffb03b");P(cx-1,FY-8-(f>.8?1:0),2,2,"#fff2b0");
+    if(!still&&((t/400|0)%3===0))P(cx+2,FY-11,1,1,"#ffb03b"); // ember
+  }else if(type==="treasure"){
+    glow(cx,FY-4,10,"#ffd25a",.16,true);
+    P(cx-6,FY-6,12,6,"#78502f");P(cx-6,FY-8,12,2,"#5a3a24");P(cx-6,FY-6,12,1,"#3c2516");
+    P(cx-1,FY-6,2,2,"#ffd25a");P(cx-6,FY-4,12,1,"#b8862a");
+    const tw=still?0:(t/250+seed)%6;if(tw<1)P(cx+4,FY-10,1,1,"#fff6c8");else if(tw<2)P(cx-5,FY-11,1,1,"#fff6c8");
+  }else if(boss){
+    // carved skull keystone and purple torches
+    P(cx-4,top-7,8,5,"#cfc4a2");P(cx-3,top-6,2,2,"#2a2636");P(cx+1,top-6,2,2,"#2a2636");P(cx-2,top-2,4,1,"#cfc4a2");P(cx-1,top-2,1,1,"#2a2636");P(cx+1,top-2,1,1,"#2a2636");
+    [[cx-mw-6,FY-16],[cx+mw+4,FY-16]].forEach(([x,y],k)=>{P(x,y,2,8,"#3c2516");const f=still?0:Math.sin(t/80+k*2);
+      glow(x+1,y-3,6+(f>0?1:0),"#8a4cff",.2,false);P(x-1,y-3,4,3,"#8a4cff");P(x,y-4-(f>0?1:0),2,2,"#c9a8ff")});
+    if(!blink){glow(cx-5,FY-15,4,"#8a4cff",.25,true);glow(cx+4,FY-15,4,"#8a4cff",.25,true);P(cx-6,FY-16,3,2,"#b48cff");P(cx+3,FY-16,3,2,"#b48cff")}
+  }
+}
+function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>drawCave(cv,t))}
 function titleView(){
   const best=loadBest();
-  return `<section class="room title"><canvas class="scene" id="scene" width="192" height="108" role="img" aria-label="Pixel art: a ghost town at night with ghosts drifting past, and a stone dungeon gate lit by two torches"></canvas>
+  return `<section class="room title"><canvas class="scene" id="scene" width="192" height="108" role="img" aria-label="Pixel art: a dark cavern with a torchlit stone stairway leading down, potions on a ledge, a glowing relic on a pedestal, and eyes watching from the shadows"></canvas>
     <p class="label">A riddle roguelike</p><h1>Conungeon</h1>
-    <p>Thirteen floors down, a dead oracle called the Necroracle waits with one last question. Answer trivia to fight your way to it, then deeper forever. Get one wrong, and the crypt strikes back.</p>
+    <p>A crypt with no bottom, and every monster in it is a question. Answer trivia to fight your way down and see how deep you can go. Get one wrong, and the crypt strikes back.</p>
     <ul class="rules">
       <li><b>Pick an attack school</b> each turn. Hitting a foe's weakness doubles damage.</li>
       <li><b>Answer in 6 seconds</b> for a critical hit. Three correct in a row adds a streak bonus.</li>
-      <li><b>Questions get harder</b> the deeper you go, and new monsters appear. The Librarian Lich waits on floor 5, the Wyrm on floor 10, and the Necroracle on unlucky floor 13.</li>
-      <li><b>Collect relics and items</b> between fights. Keys 1–4 answer questions.</li>
+      <li><b>Questions get harder</b> the deeper you go, and new monsters appear. A boss guards every fifth floor.</li>
+      <li><b>Grow tougher</b> with every win: each monster raises your max HP, and bosses fully heal you. Campfires let you rest or train.</li>
+      <li><b>Collect relics and items.</b> Relics are passive and stack. Items go in a 4-slot pack. Keys 1–4 answer questions.</li>
     </ul>
     ${pastRuns()}
     <p class="label">${statusLine()}${best?` · Deepest floor ${best}`:""}</p>
@@ -664,7 +770,9 @@ document.addEventListener("click",ev=>{
   else if(a==="next")nextTurn();
   else if(a==="reward")takeReward(i);
   else if(a==="advance")advance();
-  else if(a==="endless"){S.endless=true;S.log.unshift("You step past the Necroracle's empty throne. The stairs keep going down.");S.rewardOpts=offerRewards(3,false);S.rewardTitle="The Necroracle's offerings";S.rewardNote="Take one.";S.screen="reward";render()}
+  else if(a==="rest"){if(b.dataset.v==="train"){S.maxHp+=8;S.hp=Math.min(S.maxHp,S.hp+8);S.floorEvent="Trained at a campfire · +8 max HP";S.log.unshift("You train by the fire. +8 max HP.")}
+    else{const h=Math.ceil(S.maxHp*.4);S.hp=Math.min(S.maxHp,S.hp+h);S.floorEvent="Rested at a campfire";S.log.unshift(`You rest by the fire and recover ${h} HP.`)}advance()}
+  else if(a==="menu"){stopTimer();S=null;render();window.scrollTo&&scrollTo({top:0})}
   else if(a==="item")useItem(i);
 });
 document.addEventListener("keydown",ev=>{
