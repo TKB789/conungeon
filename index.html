@@ -46,8 +46,14 @@ button:focus-visible{outline:2px solid var(--torch);outline-offset:2px}
 .kithead{display:flex;justify-content:space-between;gap:8px}
 .kithead .full{color:var(--blood)}
 .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.slot{min-height:46px;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 6px;font-size:13px;line-height:1.15;border:1px solid var(--mana);color:var(--mana);background:var(--stone);border-radius:6px;min-width:0;overflow-wrap:anywhere}
+.slot{min-height:50px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px 4px 4px;font-size:12.5px;line-height:1.15;border:1px solid var(--mana);color:var(--mana);background:var(--stone);border-radius:6px;min-width:0;overflow-wrap:break-word;hyphens:auto}
 button.slot:hover{background:var(--slab-2)}
+.slot{position:relative}
+.slot b{position:absolute;top:2px;right:4px;font-family:var(--mono);font-size:10px;font-weight:400;color:var(--parch);opacity:.85}
+.slot.drop{border-color:var(--blood);color:var(--parch);flex-direction:column;gap:2px}
+.slot .x{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--blood)}
+.kitright{display:flex;gap:10px;align-items:center}
+.linkbtn{background:none;border:0;padding:0;color:var(--torch);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;text-decoration:underline}
 .slot.empty{border:1px dashed var(--line);color:var(--dim);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
 .relics{display:flex;flex-wrap:wrap;gap:6px}
 .chip b{font-family:var(--mono);font-size:12px}
@@ -62,6 +68,16 @@ button.chip.item:hover{background:var(--slab-2)}
 .room{background:var(--slab);border:1px solid var(--line);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px}
 .doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .doors .door.boss{grid-column:1/-1}
+.campscene{display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges;background:#120e1c;border:4px solid #05040a;box-shadow:0 6px 0 #0008}
+.travelers{display:flex;flex-direction:column}
+.trav{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.trav:last-child{border-bottom:0}
+.trav .mono{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;font-family:var(--display);font-size:20px;color:#fff2d6;box-shadow:inset 0 -3px 0 #0005}
+.trav strong{display:block;line-height:1.2}
+.trav p{margin:2px 0 0;font-size:14px}
+.trav .btn{padding:8px 12px;font-size:15px}
+.blessed{color:#7fe0f0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
 .doors .shopcard{grid-column:1/-1}
 .doors .shopcard .tent{max-width:60%;margin-inline:auto}
 .door:disabled{opacity:.55;cursor:default;transform:none}
@@ -135,6 +151,10 @@ button.chip.item:hover{background:var(--slab-2)}
 .review>div{display:grid;gap:2px;padding-bottom:10px;border-bottom:1px solid var(--line)}
 .review>div:last-child{border-bottom:0;padding-bottom:0}
 @media (max-width:420px){.cats{grid-template-columns:1fr}.cat{flex-direction:row;justify-content:space-between}}
+.saved{color:var(--mana)}
+.savecard{width:100%;display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1px solid var(--mana);border-radius:8px;background:var(--stone)}
+.savecard strong{font-size:18px}
+.confirm{width:100%;display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--blood);border-radius:8px;background:var(--stone)}
 .trophy{width:100%;display:flex;flex-direction:column;gap:4px;padding:14px;border:1px solid #6a5a33;border-radius:8px;background:radial-gradient(circle at 50% 0%,#3a2f12,var(--stone) 70%)}
 .trophy strong{font-family:var(--display);font-size:24px;color:var(--gold);line-height:1.1}
 .floors{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:15px}
@@ -382,7 +402,12 @@ const ITEMS=[
  {id:"glass",n:"Hourglass",d:"Add 15 seconds to the current question",bt:true},
  {id:"ward",n:"Ward Rune",d:"Block the next hit completely",bt:false}
 ];
-const BASE_TIME=20, MAX_ITEMS=4;
+const BASE_TIME=20, MAX_ITEMS=8, STACK=10, RELIC_MAX=10;
+// The pack holds 8 slots. Copies of the same item stack in one slot, up to 10.
+const packItems=()=>(S.items=(S.items||[]).map(x=>typeof x==="string"?{id:x,n:1}:x).filter(x=>ITEMS.some(i=>i.id===x.id)));
+const canAdd=id=>{const it=packItems();return it.some(x=>x.id===id&&x.n<STACK)||it.length<MAX_ITEMS};
+function addItem(id){if(!canAdd(id))return false;const s=S.items.find(x=>x.id===id&&x.n<STACK);if(s)s.n++;else S.items.push({id,n:1});return true}
+function dropItem(i){const s=packItems()[i];if(!s)return;const it=ITEMS.find(x=>x.id===s.id);S.items.splice(i,1);S.log.unshift(`You leave ${s.n>1?`${s.n} ${it.n}s`:`the ${it.n}`} behind.`);render()}
 
 // ---------- State
 let S, timerId=null;
@@ -413,11 +438,13 @@ const LINES=[
 const FAREWELL=["Go on, brave one. Come back and tell me what's down there.","I'll keep a lantern lit for you.","If you see anything strange down there, remember every detail for me.","You know more than you think. Trust it."];
 const LESSON=["e","e","m","m","h"], GOLD_FOR={e:3,m:5,h:8};
 const TENT_COLORS=["#3f7f6a","#7a4a8c","#3f5f9f","#9a5a2c","#8c3f4a","#5a7a3a"];
+// A traveler for every subject in the question archive. Lessons can be repeated as often as you like.
+const MAX_BLESSINGS=3;
 function makeCamp(){
-  const cats=shuffle(available()).slice(0,4), names=shuffle(NAMES), lines=shuffle(LINES);
-  return {tents:cats.map((cat,i)=>({cat,name:names[i],title:TITLES[cat]||"Sage",line:lines[i%lines.length].replace("{cat}",cat.toLowerCase()==="general"?"general knowledge":cat),color:TENT_COLORS[i%TENT_COLORS.length],done:false,score:0}))};
+  const cats=[...new Set(allQs().map(q=>q[0]))].sort(), names=shuffle(NAMES), lines=shuffle(LINES);
+  return {tents:cats.map((cat,i)=>({cat,name:names[i%names.length],title:TITLES[cat]||"Sage",line:lines[i%lines.length].replace("{cat}",cat==="General"?"general knowledge":cat),color:TENT_COLORS[i%TENT_COLORS.length],lessons:0,best:0}))};
 }
-function openTent(i){const t=S.camp.tents[i];if(t.done)return;S.lesson={tent:i,k:0,score:0,gold:0};S.screen="lesson";lessonQuestion()}
+function openTent(i){S.lesson={tent:i,k:0,score:0,gold:0};S.screen="lesson";lessonQuestion();window.scrollTo&&scrollTo({top:0})}
 function lessonQuestion(){const L=S.lesson,t=S.camp.tents[L.tent];S.q=getQuestion(t.cat,LESSON[L.k]);S.phase="ask";render()}
 function lessonAnswer(opt){
   if(S.phase!=="ask")return;S.phase="result";S.picked=opt;
@@ -428,8 +455,8 @@ function lessonAnswer(opt){
 function lessonNext(){
   const L=S.lesson,t=S.camp.tents[L.tent];
   if(L.k<LESSON.length-1){L.k++;lessonQuestion();return}
-  t.done=true;t.score=L.score;
-  if(L.score===LESSON.length&&!S.blessings.includes(t.cat)){S.blessings.push(t.cat);S.log.unshift(`${t.name} gives you the ${t.title}'s Blessing: +50% damage with ${t.cat}.`)}
+  t.lessons++;t.best=Math.max(t.best,L.score);L.blessed=false;
+  if(L.score===LESSON.length&&!S.blessings.includes(t.cat)&&S.blessings.length<MAX_BLESSINGS){S.blessings.push(t.cat);L.blessed=true;S.log.unshift(`${t.name} gives you the ${t.title}'s Blessing: ×2 damage with ${t.cat}.`)}
   else S.log.unshift(`${t.name} the ${t.title}: ${L.score} of 5. You earn ${L.gold} gold.`);
   S.phase="done";render();
 }
@@ -444,7 +471,7 @@ const WARES=[
 ];
 function buy(id){
   const w=WARES.find(x=>x.id===id);if(!w||S.gold<w.cost)return;
-  if(w.kind==="item"){if(S.items.length>=MAX_ITEMS)return;S.items.push(w.id)}
+  if(w.kind==="item"){if(!addItem(w.id))return}
   else{if(S.bought[w.id])return;S.bought[w.id]=1;if(w.id==="vigor"){S.maxHp+=10;S.hp+=10}else S.power+=2}
   S.gold-=w.cost;S.log.unshift(`You buy a ${w.n} for ${w.cost} gold.`);render();
 }
@@ -456,7 +483,7 @@ function descend(){
 }
 function newRun(){
   rollDay();
-  S={screen:"camp",floor:1,gold:0,bought:{},blessings:[],camp:null,hp:30,maxHp:30,power:6,relics:[],items:["potion"],used:{},ward:false,
+  S={screen:"camp",floor:1,gold:0,bought:{},blessings:[],camp:null,hp:30,maxHp:30,power:6,relics:[],items:[{id:"potion",n:1}],used:{},ward:false,
      correct:0,asked:0,streak:0,bestStreak:0,missed:[],endless:false,floorLog:[],floorEvent:"",runId:Date.now(),log:["You reach base camp at the mouth of the Conungeon. Travelers wave you over."],best:loadBest()};
   S.camp=makeCamp();render();
 }
@@ -506,7 +533,7 @@ function startFight(t){
   const tier=tierFor(f), mix=tier===3&&Math.random()<.4?TIERS[2]:TIERS[tier];
   const [n,g,hit]=boss?bossFor(f):pick(mix);
   // Monsters keep getting tougher the deeper you go, so every run has a natural limit.
-  let hp=10+f*6+Math.floor(f*f/5), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/40);
+  let hp=10+f*6+Math.floor(f*f/4), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/35);
   if(elite){hp=Math.round(hp*1.5);atk+=2}
   if(boss){hp=f===5?60:f===10?120:Math.round(hp*2.2);atk+=3}
   const cats=shuffle(available());
@@ -539,7 +566,7 @@ function answer(opt){
     let dmg=S.power+3*cnt("quill"), notes=[];
     if(S.q.cat===e.weak){dmg*=2+.5*cnt("lens");notes.push("weakness")}
     else if(S.q.cat===e.resist){dmg*=.5;notes.push("resisted")}
-    if(S.blessings&&S.blessings.includes(S.q.cat)){dmg*=1.5;notes.push("blessing")}
+    if(S.blessings&&S.blessings.includes(S.q.cat)){dmg*=2;notes.push("blessed")}
     if(elapsed<=6+4*cnt("ember")){dmg*=1.5;notes.push("critical")}
     if(S.streak>=3){dmg+=3;notes.push(`streak ${S.streak}`)}
     dmg=Math.round(dmg);e.hp=Math.max(0,e.hp-dmg);
@@ -572,7 +599,7 @@ function nextTurn(){
   S.offer=shuffle(o);render();
 }
 function offerRewards(n,relicOnly){
-  const relics=shuffle(RELICS).map(r=>({...r,kind:"relic",owned:cnt(r.id)}));
+  const relics=shuffle(RELICS.filter(r=>cnt(r.id)<RELIC_MAX)).map(r=>({...r,kind:"relic",owned:cnt(r.id)}));
   const items=shuffle(ITEMS).map(i=>({...i,kind:"item"}));
   if(relicOnly)return relics.length?relics.slice(0,n):items.slice(0,n);
   const out=[];if(relics.length&&Math.random()<.6)out.push(relics[0]);
@@ -580,20 +607,20 @@ function offerRewards(n,relicOnly){
 }
 function takeReward(i){
   const r=S.rewardOpts[i];
-  if(r.kind==="relic"){S.relics.push(r.id);if(r.id==="tome"){S.maxHp+=10;S.hp+=10}const k=cnt(r.id);S.log.unshift(k>1?`You claim another ${r.n}. Now ×${k}.`:`You claim the ${r.n}.`)}
-  else{if(S.items.length>=MAX_ITEMS)return;S.items.push(r.id);S.log.unshift(`You pocket a ${r.n}.`)}
+  if(r.kind==="relic"){if(cnt(r.id)>=RELIC_MAX)return;S.relics.push(r.id);if(r.id==="tome"){S.maxHp+=10;S.hp+=10}const k=cnt(r.id);S.log.unshift(k>1?`You claim another ${r.n}. Now ×${k}.`:`You claim the ${r.n}.`)}
+  else{if(!addItem(r.id))return;S.log.unshift(`You pocket a ${r.n}.`)}
   S.floorEvent+=` · took ${r.n}`;
   advance();
 }
 // ---------- Run log: one line per floor cleared, plus saved history of past runs
 function advance(){S.floorLog.push({f:S.floor,t:S.floorEvent||"Passed through"});S.floorEvent="";S.floor++;S.doors=makeDoors();S.screen="map";render()}
 function useItem(i){
-  const id=S.items[i];
+  const slot=packItems()[i];if(!slot)return;const id=slot.id;
   if(id==="potion"){if(S.hp>=S.maxHp)return;const h=Math.max(12,Math.round(S.maxHp*.3));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You drink a Healing Draught. +${h} HP.`)}
   else if(id==="ward"){if(S.ward)return;S.ward=true;S.log.unshift("A Ward Rune glows around you.")}
   else if(id==="halve"){if(S.screen!=="battle"||S.phase!=="ask")return;S.q.removed=S.q.opts.filter(o=>o!==S.q.right).slice(0,2);S.log.unshift("The scroll burns away two lies.")}
   else if(id==="glass"){if(S.screen!=="battle"||S.phase!=="ask")return;S.tMax+=15;S.tLeft+=15;startTimer();S.log.unshift("Sand flows backward. +15 seconds.")}
-  S.items.splice(i,1);render();if(S.phase==="ask"&&S.screen==="battle")startTimer();
+  slot.n--;if(slot.n<=0)S.items.splice(i,1);render();if(S.phase==="ask"&&S.screen==="battle")startTimer();
 }
 const RUNS_KEY="conungeon-runs";
 function loadRuns(){try{return JSON.parse(localStorage.getItem(RUNS_KEY)||"[]")}catch(e){return []}}
@@ -605,17 +632,30 @@ function recordRun(win){
   try{localStorage.setItem(RUNS_KEY,JSON.stringify(runs.slice(0,25)))}catch(e){}
 }
 function floorList(log){return `<ol class="floors">${log.map(x=>`<li class="${x.good?"good":x.end?"end":""}"><span class="num">${x.f}</span><span>${esc(x.t)}</span></li>`).join("")}</ol>`}
+// ---------- Saving: campsites (base camp and every campfire) save your descent in this browser
+const SAVE_KEY="conungeon-save";
+let confirmNew=false;
+function saveGame(){
+  if(!S)return;const where=S.screen==="rest"?`Campfire on floor ${S.floor}`:S.screen==="reward"?`Past the Super Computaur, floor ${S.floor}`:"Base camp";
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({...S,q:null,lesson:null,enemy:null,offer:null,phase:null,managePack:false,picked:null,
+    screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,6),savedAt:Date.now(),savedWhere:where}))}catch(e){}
+}
+function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY)||"null");return d&&d.screen?d:null}catch(e){return null}}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
+function resumeGame(){const d=readSave();if(!d)return;stopTimer();S=d;S.best=loadBest();S.log.unshift(`You return to ${d.savedWhere.toLowerCase().startsWith("base")?"base camp":"the "+d.savedWhere.toLowerCase()}. Welcome back.`);render();window.scrollTo&&scrollTo({top:0})}
 function endRun(win){
-  stopTimer();S.screen=win?"win":"dead";recordRun(win);
+  stopTimer();S.screen=win?"win":"dead";recordRun(win);clearSave();
   const reached=S.floor;if(reached>S.best){S.best=reached;saveBest(reached)}render();
 }
 
 // ---------- Render
 const ROOM={fight:["x","Monster","A foe for your wits"],elite:["X","Elite","Harder questions, better spoils"],rest:["~","Campfire","Rest or train"],treasure:["$","Reliquary","Claim a relic"],boss:["&","Boss","Guardian of the floor"]};
 function hud(){
-  const full=S.items.length>=MAX_ITEMS;
-  const slots=Array.from({length:MAX_ITEMS},(_,i)=>{const id=S.items[i];if(!id)return `<span class="slot empty">Empty</span>`;
-    const it=ITEMS.find(x=>x.id===id);return `<button class="slot" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}</button>`}).join("");
+  const P=packItems(),full=P.length>=MAX_ITEMS,manage=!!S.managePack;
+  const slots=Array.from({length:MAX_ITEMS},(_,i)=>{const sl=P[i];if(!sl)return `<span class="slot empty">Empty</span>`;
+    const it=ITEMS.find(x=>x.id===sl.id);
+    return manage?`<button class="slot drop" data-a="drop" data-i="${i}" aria-label="Drop ${esc(it.n)}">${esc(it.n)}${sl.n>1?`<b>×${sl.n}</b>`:""}<span class="x">Drop</span></button>`
+      :`<button class="slot" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
   const relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.d)}${k>1?` (×${k})`:""}">${esc(r.n)}${k>1?` <b>×${k}</b>`:""}</span>`}).join("");
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label">Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
@@ -623,9 +663,9 @@ function hud(){
       <div class="label" style="margin-top:6px">Power ${S.power} · Streak ${S.streak}</div></div>
     ${["camp","lesson","shop"].includes(S.screen)?`<div class="floor"><div class="label">Gold</div><b>${S.gold}</b></div>`:`<div class="floor"><div class="label">Floor</div><b>${S.floor}</b>${S.floor<=GOAL&&!S.won?`<span class="muted num"> /${GOAL}</span>`:""}</div>`}
     <div class="kit">
-      <div class="kithead"><span class="label">Pack</span><span class="label ${full?"full":""}">${S.items.length} / ${MAX_ITEMS}${full?" · full":""}</span></div>
+      <div class="kithead"><span class="label">Pack</span><span class="kitright"><span class="label ${full?"full":""}">${P.length} / ${MAX_ITEMS}${full?" · full":""}</span>${P.length?`<button class="linkbtn" data-a="manage">${manage?"Done":"Drop items"}</button>`:""}</span></div>
       <div class="slots">${slots}</div>
-      ${relics||S.blessings.length||S.won?`<div class="kithead"><span class="label">Relics · passive, stack</span></div><div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="+50% damage with ${esc(c)}">${esc(TITLES[c]||"Sage")}'s Blessing</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">Trivial Relic of Inconsequence</span>`:""}</div>`:""}
+      ${relics||S.blessings.length||S.won?`<div class="kithead"><span class="label">Relics · passive, stack to 10</span></div><div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 damage with ${esc(c)}">${esc(TITLES[c]||"Sage")}'s Blessing</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">Trivial Relic of Inconsequence</span>`:""}</div>`:""}
     </div>
   </div>`;
 }
@@ -634,16 +674,21 @@ function logView(){return `<div class="log" aria-live="polite">${S.log.slice(0,5
 function render(){
   const app=$("#app");
   if(!S){app.innerHTML=titleView();frame(performance.now());return}
+  if(S.screen==="camp"||S.screen==="rest")saveGame();
   let body="";
   if(false){
   }else if(S.screen==="camp"){
     const T=S.camp.tents;
-    body=`<section class="room"><div><p class="label">Base camp · the mouth of the Conungeon</p><h2>Travelers gather by the fire</h2>
-      <p class="muted">They've heard the stories and want to learn the Conungeon's secrets with you. Each one teaches five questions. Answer all five correctly to earn their blessing for this descent. Every right answer earns gold for the merchant.</p></div>
-      <div class="doors">${T.map((t,i)=>`<button class="door tentcard" data-a="tent" data-i="${i}" ${t.done?"disabled":""}><canvas class="tent" width="64" height="44" data-kind="teach" data-color="${t.color}" data-seed="${i+3}" aria-hidden="true"></canvas>
-        <strong>${esc(t.name)} the ${esc(t.title)}</strong><small>${esc(t.cat)} · ${t.done?(t.score===5?"Perfect! Blessing earned":`${t.score} of 5`):"5 questions"}</small></button>`).join("")}
-        <button class="door tentcard shopcard" data-a="shop"><canvas class="tent" width="64" height="44" data-kind="shop" data-seed="9" aria-hidden="true"></canvas><strong>The merchant</strong><small>Potions and tomes for gold</small></button></div>
-      <div class="row-end"><button class="btn" data-a="descend">Descend into the Conungeon</button></div></section>`;
+    body=`<section class="room"><canvas class="campscene" id="campscene" width="192" height="108" role="img" aria-label="Pixel art: a striped merchant pavilion lit by lanterns, with potions and tomes on its counter and travelers' tents in the background"></canvas>
+      <div><p class="label">Base camp · <span class="saved">progress saved</span></p><h2>The merchant's pavilion</h2></div>
+      <p class="speech">Potions for the brave, tomes for the curious. I'd go down there myself, but someone has to mind the shop. Earn gold by learning from the travelers.</p>
+      <div class="wares">${WARES.map(w=>{const owned=w.kind==="tome"&&S.bought[w.id],full=w.kind==="item"&&!canAdd(w.id),poor=S.gold<w.cost;
+        return `<div class="ware"><div><strong>${esc(w.n)}</strong><p class="muted">${esc(w.d)}${w.kind==="tome"?" · one per descent":""}</p></div><button class="btn ghost" data-a="buy" data-id="${w.id}" ${owned||full||poor?"disabled":""}>${owned?"Bought":full?"Pack full":`${w.cost} gold`}</button></div>`}).join("")}</div></section>
+    <section class="room"><div><p class="label">Blessings ${S.blessings.length} / ${MAX_BLESSINGS}</p><h2>Travelers around the fire</h2>
+      <p class="muted">They're curious about the Conungeon and want to learn with you. Each lesson is five questions. Get all five right for the traveler's blessing: ×2 damage with their subject for this descent. You can carry ${MAX_BLESSINGS} blessings.</p></div>
+      <div class="travelers">${T.map((t,i)=>{const b=S.blessings.includes(t.cat);
+        return `<div class="trav"><span class="mono" style="background:${t.color}">${esc(t.name[0])}</span><div style="min-width:0"><strong>${esc(t.name)} the ${esc(t.title)}</strong><p class="muted">${esc(t.cat)} · ${b?`<span class="blessed">Blessed ×2</span>`:t.lessons?`${t.lessons} lesson${t.lessons>1?"s":""}, best ${t.best} of 5`:"Hasn't met you yet"}</p></div><button class="btn ghost" data-a="tent" data-i="${i}">${t.lessons?"Learn more":"Learn"}</button></div>`}).join("")}</div>
+      <div class="row" style="justify-content:space-between"><button class="btn ghost" data-a="menu">Back to title</button><button class="btn" data-a="descend">Descend into the Conungeon</button></div></section>`;
   }else if(S.screen==="lesson"){
     const L=S.lesson,t=S.camp.tents[L.tent],q=S.q,done=S.phase!=="ask";
     const dots=LESSON.map((_,k)=>`<i class="${k<L.k||(k===L.k&&done)?"on":""} ${k===L.k?"now":""}"></i>`).join("");
@@ -651,10 +696,13 @@ function render(){
     if(S.phase==="done"){
       const perfect=L.score===LESSON.length;
       main=`<div class="lessonend"><p class="label">Lesson complete</p><h2>${L.score} of 5</h2>
-        ${perfect?`<div class="trophy"><span class="label">Perfect lesson</span><strong>${esc(t.title)}'s Blessing</strong><span class="muted">+50% damage when you attack with ${esc(t.cat)}, for this whole descent.</span></div>`:`<p class="muted">Get all five right to earn a traveler's blessing.</p>`}
-        <p class="speech">${esc(perfect?"Remarkable. Take my blessing, and come back up to tell me everything.":pick(FAREWELL))}</p>
+        ${L.blessed?`<div class="trophy"><span class="label">Perfect lesson</span><strong>${esc(t.title)}'s Blessing</strong><span class="muted">×2 damage when you attack with ${esc(t.cat)}, for this whole descent.</span></div>`
+          :perfect&&S.blessings.includes(t.cat)?`<p class="muted">Perfect again. You already carry this blessing.</p>`
+          :perfect?`<p class="muted">Perfect! But you already carry ${MAX_BLESSINGS} blessings, the most anyone can.</p>`
+          :`<p class="muted">Get all five right to earn ${esc(t.name)}'s blessing. You can try again as often as you like.</p>`}
+        <p class="speech">${esc(L.blessed?"Remarkable. Take my blessing, and come back up to tell me everything.":pick(["Shall we keep going? I have plenty more.","You're getting the hang of this. Another round?",...FAREWELL]))}</p>
         <p class="muted">You earned ${L.gold} gold.</p>
-        <div><button class="btn" data-a="camp" id="nextbtn">Back to camp</button></div></div>`;
+        <div class="row"><button class="btn" data-a="tent" data-i="${L.tent}" id="nextbtn">Keep learning</button><button class="btn ghost" data-a="camp">Back to camp</button></div></div>`;
     }else{
       main=`<div class="meta"><span class="label">${esc(q.cat)} · ${{e:"easy",m:"medium",h:"hard"}[q.d]} · ${GOLD_FOR[q.d]} gold</span><span class="dots">${dots}</span></div>
         <p class="q">${esc(q.text)}</p>
@@ -664,32 +712,25 @@ function render(){
     }
     body=`<section class="room"><div class="teacher"><canvas class="tent small" width="64" height="44" data-kind="teach" data-color="${t.color}" data-seed="${L.tent+3}" aria-hidden="true"></canvas>
       <div style="min-width:0"><p class="label">${esc(t.cat)}</p><h2>${esc(t.name)} the ${esc(t.title)}</h2></div></div>
-      ${L.k===0&&S.phase==="ask"?`<p class="speech">${esc(t.line)}</p>`:""}${main}</section>`;
-  }else if(S.screen==="shop"){
-    body=`<section class="room"><div class="teacher"><canvas class="tent small" width="64" height="44" data-kind="shop" data-seed="9" aria-hidden="true"></canvas>
-      <div style="min-width:0"><p class="label">Base camp</p><h2>The merchant's tent</h2></div></div>
-      <p class="speech">Potions for the brave, tomes for the curious. I'd go down there myself, but someone has to mind the shop.</p>
-      <div class="wares">${WARES.map(w=>{const owned=w.kind==="tome"&&S.bought[w.id],full=w.kind==="item"&&S.items.length>=MAX_ITEMS,poor=S.gold<w.cost;
-        return `<div class="ware"><div><strong>${esc(w.n)}</strong><p class="muted">${esc(w.d)}${w.kind==="tome"?" · one per descent":""}</p></div><button class="btn ghost" data-a="buy" data-id="${w.id}" ${owned||full||poor?"disabled":""}>${owned?"Bought":full?"Pack full":`${w.cost} gold`}</button></div>`}).join("")}</div>
-      <div><button class="btn" data-a="camp">Back to camp</button></div></section>`;
+      ${L.k===0&&S.phase==="ask"&&!t.lessons?`<p class="speech">${esc(t.line)}</p>`:""}${main}</section>`;
   }else if(S.screen==="map"){
     body=`<section class="room"><div><p class="label">Floor ${S.floor}</p><h2>${S.floor===GOAL?"Something hums behind this door":isBoss(S.floor)?"A great door stands alone":"Choose a passage"}</h2></div>
       <div class="doors">${S.doors.map((d,i)=>{const [g,n,s]=ROOM[d.t];return `<button class="door ${d.t}" data-a="door" data-i="${i}"><canvas class="cave" width="64" height="44" data-type="${d.t}" data-seed="${S.floor*7+i+1}" aria-hidden="true"></canvas><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
   }else if(S.screen==="rest"){
     const h=Math.min(S.maxHp-S.hp,Math.ceil(S.maxHp*.4));
-    body=`<section class="room"><p class="label">Campfire</p><h2>A moment by the fire</h2><p class="muted">Choose one, then descend.</p>
+    body=`<section class="room"><p class="label">Campfire · <span class="saved">progress saved</span></p><h2>A moment by the fire</h2><p class="muted">Your descent is saved here. You can close the game and pick up from this fire later. Choose one, then descend.</p>
       <div class="rewards"><button class="reward" data-a="rest" data-v="heal"><span class="label">Rest</span><strong>Heal ${h} HP</strong><span class="muted">Recover 40% of your max HP.</span></button>
       <button class="reward it" data-a="rest" data-v="train"><span class="label">Train</span><strong>+8 max HP</strong><span class="muted">Grow tougher for the floors below. Also heals 8.</span></button></div></section>`;
   }else if(S.screen==="reward"){
     body=`<section class="room"><p class="label">${esc(S.rewardNote)}</p><h2>${esc(S.rewardTitle)}</h2>
-      <div class="rewards">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&S.items.length>=MAX_ITEMS;
-        return `<button class="reward ${r.kind==="item"?"it":""}" data-a="reward" data-i="${i}" ${full?"disabled":""}><span class="label">${r.kind==="relic"?(r.owned?`Relic · stacks · you have ×${r.owned}`:"Relic · passive · stacks"):full?"Item · pack full":"Item · single use"}</span><strong>${esc(r.n)}</strong><span class="muted">${esc(r.d)}${full?". Use an item first to make room.":""}</span></button>`}).join("")}</div>
+      <div class="rewards">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&!canAdd(r.id);
+        return `<button class="reward ${r.kind==="item"?"it":""}" data-a="reward" data-i="${i}" ${full?"disabled":""}><span class="label">${r.kind==="relic"?(r.owned?`Relic · you have ×${r.owned} of ${RELIC_MAX}`:"Relic · passive · stacks to 10"):full?"Item · pack full":"Item · single use"}</span><strong>${esc(r.n)}</strong><span class="muted">${esc(r.d)}${full?". Use an item first to make room.":""}</span></button>`}).join("")}</div>
       <div><button class="btn ghost" data-a="advance">Take nothing</button></div></section>`;
   }else if(S.screen==="battle"){
     const e=S.enemy;
     let mid="";
     if(S.phase==="choose"){
-      mid=`<p class="label">Choose your attack school</p><div class="cats">${S.offer.map(c=>{const w=c===e.weak,r=c===e.resist;return `<button class="cat ${w?"w":r?"r":""}" data-a="cat" data-c="${c}"><strong>${c}</strong><span class="m">${w?"×"+(2+.5*cnt("lens"))+" weak":r?"×0.5 resist":"×1"}${S.blessings.includes(c)?" · blessed +50%":""}</span></button>`}).join("")}</div>`;
+      mid=`<p class="label">Choose your attack school</p><div class="cats">${S.offer.map(c=>{const w=c===e.weak,r=c===e.resist;return `<button class="cat ${w?"w":r?"r":""}" data-a="cat" data-c="${c}"><strong>${c}</strong><span class="m">${(()=>{const b=S.blessings.includes(c),m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1);const tags=[w?"weak":r?"resist":"",b?"blessed":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")})()}</span></button>`}).join("")}</div>`;
     }else{
       const q=S.q, done=S.phase==="result";
       mid=`<div class="meta"><span class="label">${q.cat} · ${{e:"easy",m:"medium",h:"hard"}[q.d]}</span><span class="label num" id="tnum">${done?"":Math.ceil(S.tLeft)+"s"}</span></div>
@@ -720,7 +761,7 @@ function render(){
       ${S.missed.length?`<section class="room"><div><p class="label">Study these</p><h2>What you missed</h2></div><div class="review">${S.missed.slice(-15).reverse().map(m=>`<div><p>${esc(m.q)}</p><p class="good">${esc(m.a)}</p></div>`).join("")}</div></section>`:""}`;
   }
   app.innerHTML=`<header><p class="label">Conungeon</p></header>`+hud()+body+logView();
-  drawDoors(performance.now());drawTents(performance.now());
+  drawDoors(performance.now());drawTents(performance.now());drawCampScene(performance.now());
   S.hitFoe=S.hitMe=false;
   const nb=$("#nextbtn");if(nb)nb.focus();
 }
@@ -735,72 +776,95 @@ function pglow(gx,gy,rad,col,a){g.fillStyle=col;for(let y=Math.floor(gy-rad);y<=
   const d=Math.hypot(x-gx,y-gy);if(d>rad)continue;if(d<rad*.5){g.globalAlpha=a;g.fillRect(x,y,1,1)}else if((x+y)%2===0){g.globalAlpha=a*.6;g.fillRect(x,y,1,1)}}g.globalAlpha=1}
 // The rock never changes, so it is drawn once into a hidden canvas and copied each frame.
 let BG=null;
-const CEIL=Array.from({length:W},(_,x)=>8+Math.round(Math.sin(x/9)*3+Math.sin(x/4.3)*1.5));
-const DRIPS=[[22,0],[61,1.7],[133,.8],[171,2.6]].map(([x,o])=>({x,o,y0:CEIL[x]+9}));
+// The Conungeon seen from outside: a cave mouth that has just burst out of the ground.
+const MX=100,MTOP=50,MFLOOR=84; // cave mouth center, top and floor
+const mouthW=y=>{const d=Math.max(0,MTOP+16-y);return Math.round(Math.sqrt(Math.max(0,22*22-d*d*1.9)))};
+const DUST=Array.from({length:14},(_,i)=>({x:70+((i*37)%62),o:i*.71,s:.6+(i%4)*.25}));
+const PEBBLES=[{x:92,o:0},{x:104,o:1.3},{x:111,o:2.4}];
 function buildBG(){
-  BG=document.createElement("canvas");BG.width=W;BG.height=H;const keep=g;g=BG.getContext("2d");seed=7;
-  // deep cavern air
-  ["#0b0911","#0e0b16","#120e1c","#161122","#1a1427"].forEach((c,i)=>px(0,i*22,W,23,c));
-  // back wall texture
-  for(let i=0;i<260;i++)px(rand()*W,14+rand()*78,2+rand()*5,1+rand()*2,rand()<.5?"#1d1729":"#100c18");
-  // side walls closing in like a tunnel
-  for(let y=0;y<FLOOR;y++){const l=Math.round(30+Math.sin(y/7)*5-y*.12+(rand()*2|0)),r=Math.round(W-28-Math.sin(y/6+1)*5+y*.1-(rand()*2|0));
-    px(0,y,l,1,"#231c33");px(l-1,y,1,1,"#3a3150");px(r,y,W-r,1,"#231c33");px(r,y,1,1,"#332a47")}
-  for(let i=0;i<120;i++){const left=rand()<.5,x=left?rand()*26:W-rand()*24;px(x,rand()*FLOOR,2+rand()*3,1,rand()<.5?"#2e2642":"#1a1426")}
-  // a dark tunnel in the left wall (something lives there)
-  for(let y=58;y<FLOOR;y++){const w=Math.round(Math.sqrt(Math.max(0,100-(Math.max(0,68-y))**2)));px(16-w/2,y,w,1,"#050409")}
-  // ceiling and stalactites
-  for(let x=0;x<W;x++){px(x,0,1,CEIL[x],"#2a2238");px(x,CEIL[x],1,1,"#3d3352")}
-  for(let x=4;x<W;x+=5+(rand()*7|0)){const len=3+(rand()*12|0),y0=CEIL[x];for(let k=0;k<len;k++){const w=Math.max(1,3-Math.floor(k/(len/3)));px(x-(w>>1),y0+k,w,1,k<2?"#3d3352":"#2a2238")}}
-  // stone doorway carved into the back wall
-  const dx=96,top=42;
-  for(let y=top-6;y<FLOOR;y++){const half=y<top+6?Math.round(Math.sqrt(Math.max(0,22*22-(top+6-y)**2*4))):22;px(dx-half,y,half*2,1,"#3f3a4d")}
-  for(let y=top-6;y<FLOOR;y+=5){const off=((y-top)/5|0)%2?0:4;for(let x=dx-22+off;x<dx+22;x+=8)px(x,y,1,5,"#2a2636");px(dx-22,y,44,1,"#2a2636")}
-  for(let y=top;y<FLOOR;y++){const half=y<top+8?Math.round(Math.sqrt(Math.max(0,14*14-(top+8-y)**2*2.2))):14;px(dx-half,y,half*2,1,"#050409")}
-  px(dx-3,top-6,6,4,"#575069");px(dx-2,top-5,4,2,"#3f3a4d"); // keystone
-  // stairs going down into the dark
-  for(let k=0;k<7;k++){const y=FLOOR-1-k*4,w=26-k*3,c=["#3f3a4d","#363044","#2d283a","#241f2f","#1b1724","#13101a","#0c0a11"][k];px(dx-w/2,y,w,2,c);px(dx-w/2,y+2,w,2,"#050409")}
-  // cave floor
-  for(let x=0;x<W;x++){const h=FLOOR+Math.round(Math.sin(x/11)*1.5);px(x,h,1,H-h,"#1a1526");px(x,h,1,1,"#2c2440")}
-  for(let i=0;i<40;i++)px(rand()*W,FLOOR+3+rand()*12,1+rand()*3,1,rand()<.5?"#2c2440":"#120e1b");
-  // rock ledge on the left for the potions
-  px(26,74,36,4,"#3a3150");px(26,74,36,1,"#4e4366");px(28,78,32,2,"#231c33");
-  // pedestal on the right for the relic
-  px(148,80,12,12,"#3f3a4d");px(146,78,16,3,"#575069");px(147,90,14,2,"#2a2636");px(150,83,8,1,"#2a2636");
-  // crystal clusters in the walls
-  [[9,30],[180,48],[170,22]].forEach(([x,y])=>{px(x,y,2,5,"#2f8fa8");px(x+2,y+2,2,3,"#2a7b92");px(x-2,y+3,2,2,"#2a7b92");px(x,y,1,2,"#7fe0f0")});
-  // bones and pebbles on the floor
-  px(120,98,6,1,"#8f876e");px(121,97,1,1,"#8f876e");px(125,99,1,1,"#8f876e");px(40,100,3,2,"#a39a7e");px(40,100,1,1,"#2a2238");px(42,100,1,1,"#2a2238");
+  BG=document.createElement("canvas");BG.width=W;BG.height=H;const keep=g;g=BG.getContext("2d");seed=11;
+  // night sky
+  ["#0b0916","#100c1d","#151026","#1a142d","#201834","#261d3a"].forEach((c,i)=>px(0,i*10,W,11,c));
+  for(let i=0;i<60;i++)px(rand()*W,rand()*46,1,1,rand()<.25?"#e4ddf6":"#6e6694");
+  // far hills, and the base camp's tents far off on the right horizon
+  for(let x=0;x<W;x++){const h=Math.round(60+Math.sin(x/17)*4+Math.sin(x/7)*1.5);px(x,h,1,14,"#1b1529")}
+  // base camp's tents on the horizon, staggered: smaller ones further back, larger ones closer
+  [[164,57,4,"#7a4a8c"],[181,56,4,"#3f5f9f"],[172,62,6,"#9a5a2c"],[188,63,5,"#8c3f4a"]].forEach(([x,top,h,c])=>{
+    for(let y=0;y<h;y++){px(x-y,top+y,y+1,1,c);px(x+1,top+y,y,1,shade(c,.7))}px(x,top+h-2,1,2,"#ffb03b");px(x,top-1,1,1,"#5a3a24")});
+  // ground
+  for(let y=70;y<H;y++)px(0,y,W,1,y<76?"#1d1826":"#1a1522");
+  for(let i=0;i<70;i++)px(rand()*W,72+rand()*36,1+rand()*3,1,rand()<.5?"#252032":"#141019");
+  // disturbed earth: an uneven ring of fresh soil heaved up around the mound, with ridges
+  for(let y=62;y<H;y++)for(let x=0;x<W;x++){
+    const dx=(x-MX)/74,dy=(y-80)/22,ang=Math.atan2(dy,dx),wob=1+.16*Math.sin(ang*5+1)+.1*Math.sin(ang*11);
+    const d=Math.hypot(dx,dy)/wob;if(d>1||(d>.86&&rand()<.5))continue;
+    const ridge=Math.abs(Math.sin(d*14+ang*2))<.18;
+    px(x,y,1,1,ridge?"#6b4c34":rand()<.1?"#2e2118":d>.75?"#3a2a1e":rand()<.5?"#4a3424":"#3f2d1f")}
+  // the rock mound the cave tore through
+  for(let y=34;y<MFLOOR;y++){const half=Math.round(14+(y-34)*.95+Math.sin(y*.9)*2);
+    for(let x=MX-half;x<MX+half;x++)px(x,y,1,1,rand()<.15?"#3d3352":rand()<.5?"#2a2238":"#312842");
+    px(MX-half,y,1,1,"#4a3f62");}
+  for(let i=0;i<40;i++)px(MX-30+rand()*60,38+rand()*40,2+rand()*3,1,rand()<.5?"#3d3352":"#1d1729");
+  // cave mouth with jagged rock teeth
+  for(let y=MTOP;y<MFLOOR;y++){const w=mouthW(y)+(rand()<.3?1:0);if(w<=0)continue;px(MX-w-1,y,1,1,"#5a4d74");px(MX-w,y,w*2,1,"#050409")}
+  for(let x=MX-18;x<MX+18;x+=3+(rand()*2|0)){const top=MTOP+16-Math.round(Math.sqrt(Math.max(0,(22*22-(x-MX)**2)/1.9)));const len=2+(rand()*5|0);
+    for(let k=0;k<len;k++)px(x,top+k,k<len-1?2:1,1,"#2a2238")}
+  for(let x=MX-16;x<MX+16;x+=4+(rand()*3|0)){const len=1+(rand()*3|0);for(let k=0;k<len;k++)px(x,MFLOOR-1-k,k?1:2,1,"#1d1729")}
+  // cracks radiating out through the soil
+  [[-1,.35],[-1,.9],[1,.3],[1,.85],[-1,1.6],[1,1.5]].forEach(([dir,slope],k)=>{let x=MX+dir*20,y=MFLOOR-2+k%2*3;
+    for(let i=0;i<34;i++){px(x,y,1,1,"#120d0a");if(rand()<.3)px(x,y+1,1,1,"#120d0a");x+=dir*(1+(rand()<.3?1:0));y+=rand()<slope*.5?1:0;if(x<2||x>W-2||y>H-2)break}});
+  // clods and boulders thrown out by the eruption
+  [[58,88,5],[146,90,6],[44,96,3],[156,100,4],[72,101,3],[130,98,3],[50,80,2],[150,82,2],[120,104,2]].forEach(([x,y,r])=>{
+    for(let yy=-r;yy<=r;yy++)for(let xx=-r-1;xx<=r+1;xx++){if(xx*xx/(r+1)**2+yy*yy/r**2>1)continue;px(x+xx,y+yy,1,1,yy<0?"#4e4466":"#2a2238")}
+    px(x-r+1,y-r+1,2,1,"#6b6386")});
+  [[66,94],[138,95],[84,102],[114,100],[34,90],[166,94]].forEach(([x,y])=>{px(x,y,3,2,"#5e4430");px(x,y,3,1,"#7a5a40")});
+  // an uprooted tree on its side, roots in the air
+  px(20,84,22,3,"#3c2a1c");px(20,84,22,1,"#5a3e28");
+  [[42,82],[43,79],[45,77],[44,84],[46,86],[41,76]].forEach(([x,y])=>px(x,y,3,1,"#5a3e28"));
+  px(16,80,5,3,"#2f3a2a");px(14,82,4,3,"#26301f");px(18,78,3,2,"#2f3a2a");
+  // a dropped satchel, potions spilling into the dirt
+  px(24,96,9,6,"#6b4a2a");px(24,96,9,1,"#8a6238");px(27,94,3,2,"#5a3e28");
+  // a relic half-buried in upturned earth
+  px(160,96,9,2,"#4a3424");
   g=keep;
 }
+// ---------- Custom art: drop PNGs into an "art" folder next to index.html and the game uses them
+// instead of the drawn art. Any file that's missing falls back to the drawn version.
+// Sizes: title.png and camp.png are 192×108; every door-*.png and tent-*.png is 64×44.
+const ART_FILES={title:"art/title.png",camp:"art/camp.png",
+  fight:"art/door-monster.png",elite:"art/door-elite.png",rest:"art/door-campfire.png",treasure:"art/door-reliquary.png",boss:"art/door-boss.png",
+  teach:"art/tent-traveler.png",shop:"art/tent-merchant.png"};
+const ART={};
+if(typeof Image!=="undefined"&&location.protocol!=="file:")for(const [k,src] of Object.entries(ART_FILES)){const im=new Image();im.onload=()=>{ART[k]=im;if(typeof render==="function")render()};im.src=src}
+function useArt(cv,key){const im=ART[key];if(!im)return false;const c=cv.getContext("2d");c.imageSmoothingEnabled=false;c.clearRect(0,0,cv.width,cv.height);c.drawImage(im,0,0,cv.width,cv.height);return true}
 function frame(t){
   const cv=document.getElementById("scene");if(!cv){g=null;return}
+  if(useArt(cv,"title"))return;
   if(!BG)buildBG();g=cv.getContext("2d");g.drawImage(BG,0,0);
-  const T=still?0:t, dx=96;
-  // torches beside the doorway
-  [[dx-30,62],[dx+28,62]].forEach(([x,y],k)=>{const f=still?0:Math.sin(T/90+k*2)+Math.sin(T/37+k);
-    pglow(x+1,y-3,11+(f>0?1:0),"#ffb03b",.12);px(x,y,2,8,"#3c2516");px(x-1,y-3,4,3,"#ff6a2b");px(x,y-5-(f>0?1:0),2,3,"#ffb03b");px(x,y-3,2,1,"#fff2b0")});
-  // potions on the ledge
-  [[31,"#e0473b"],[39,"#4b7bff"],[47,"#3fc77a"],[54,"#c25bff"]].forEach(([x,c],k)=>{
-    pglow(x+1.5,70,4,c,.14+(still?0:.06*Math.sin(T/400+k)));
-    px(x,69,4,5,c);px(x+1,67,2,2,"#9d93b8");px(x+1,66,2,1,"#8a5a34");px(x,69,1,2,"#f4f0ff");px(x+3,72,1,2,"#1a1426")});
-  // the relic: a gem on the pedestal, slowly pulsing
+  const T=still?0:t;
+  // a faint glow from deep inside the mouth
+  pglow(MX,MFLOOR-8,14,"#5a2a6a",.12+(still?0:.05*Math.sin(T/700)));
+  // eyes in the dark, never more than eyes
+  [{x:MX-9,y:MFLOOR-14,c:"#ff4a3a",o:0},{x:MX+4,y:MFLOOR-20,c:"#ffd25a",o:2.6},{x:MX-2,y:MFLOOR-7,c:"#c9a8ff",o:5.1}].forEach(e=>{
+    const cyc=(T/1000+e.o)%8;if(!still&&(cyc>6.8||(cyc>2.5&&cyc<2.65)))return;
+    const sh=!still&&cyc>4.5&&cyc<6.8?1:0;pglow(e.x+2+sh,e.y,3,e.c,.16);px(e.x+sh,e.y,1,1,e.c);px(e.x+3+sh,e.y,1,1,e.c)});
+  // potions spilling from the satchel
+  [[34,99,"#e0473b",0],[38,101,"#4b7bff",1],[30,102,"#3fc77a",2],[42,98,"#c25bff",3]].forEach(([x,y,c,k])=>{
+    pglow(x+1,y+1,3.5,c,.14+(still?0:.06*Math.sin(T/400+k)));
+    k%2?(px(x,y+1,5,2,c),px(x+5,y+1,1,1,"#9d93b8")):(px(x,y,2,4,c),px(x,y-1,2,1,"#9d93b8"));
+    if(!still&&((T/260+k*1.9)%6)<1)px(x,y+1,1,1,"#ffffff")});
+  // the half-buried relic pulses
   const pu=still?.5:(Math.sin(T/500)+1)/2;
-  pglow(154,73,9+pu*2,"#ffd25a",.14+.08*pu);
-  px(152,72,5,5,"#ffd25a");px(153,71,3,7,"#ffd25a");px(151,73,7,3,"#ffd25a");px(153,73,3,3,"#ff9a3a");px(153,72,1,1,"#fff6c8");
-  const tw=(T/220)%7;if(!still&&tw<1)px(159,69,1,1,"#fff6c8");else if(!still&&tw<2)px(149,70,1,1,"#fff6c8");
-  // crystals shimmer
-  [[9,30],[180,48],[170,22]].forEach(([x,y],k)=>{if(still||Math.sin(T/350+k*2)>.6){pglow(x+1,y+2,4,"#7fe0f0",.15);px(x,y,1,2,"#d8fbff")}});
-  // eyes in the dark: never more than eyes
-  const eyes=[{x:13,y:72,c:"#ffd25a",o:0},{x:dx-3,y:52,c:"#ff4a3a",o:2.1},{x:170,y:34,c:"#7fe08a",o:4.3},{x:184,y:80,c:"#c9a8ff",o:6.7}];
-  eyes.forEach(e=>{const cyc=(T/1000+e.o)%9;if(!still&&(cyc>7.6||(cyc>3&&cyc<3.15)))return;
-    const shift=!still&&cyc>5&&cyc<7.6?1:0;pglow(e.x+2+shift,e.y,3,e.c,.15);px(e.x+shift,e.y,1,1,e.c);px(e.x+3+shift,e.y,1,1,e.c)});
-  // water dripping from stalactites
-  if(!still)DRIPS.forEach(d=>{const p=((T/1000+d.o)%3.2)/3.2,fall=p*p*(FLOOR-d.y0)*1.0;
-    if(p<.92)px(d.x,d.y0+fall,1,2,"#6fa8c8");else{const s=(p-.92)/.08;px(d.x-1-s*2,FLOOR-1,1,1,"#6fa8c8");px(d.x+1+s*2,FLOOR-1,1,1,"#6fa8c8")}});
+  pglow(164,94,8+pu*2,"#ffd25a",.12+.08*pu);
+  px(162,92,5,4,"#ffd25a");px(163,91,3,1,"#ffd25a");px(163,93,3,2,"#ff9a3a");px(163,92,1,1,"#fff6c8");px(160,96,9,2,"#4a3424");
+  const tw=(T/230)%7;if(!still&&tw<1)px(168,89,1,1,"#fff6c8");else if(!still&&tw<2)px(159,91,1,1,"#fff6c8");
+  // dust still settling over the fresh earth
+  if(!still)DUST.forEach(d=>{const p=((T/1000*d.s+d.o)%4)/4;const y=MFLOOR-2-p*30,x=d.x+Math.round(Math.sin(p*6+d.o)*3);g.globalAlpha=(1-p)*.55;px(x,y,1,1,"#8a7a66");g.globalAlpha=1});
+  // pebbles still dropping from the lip of the cave
+  if(!still)PEBBLES.forEach(pb=>{const p=((T/1000+pb.o)%3.4)/3.4;if(p<.35){const top=MTOP+16-Math.round(Math.sqrt(Math.max(0,(22*22-(pb.x-MX)**2)/1.9)));px(pb.x,top+p/.35*(MFLOOR-top-2),1,1,"#6b6386")}});
 }
 let last=0;
-function loop(t){if(t-last>80){frame(t);drawDoors(t);drawTents(t);last=t}requestAnimationFrame(loop)}
+function loop(t){if(t-last>80){frame(t);drawDoors(t);drawTents(t);drawCampScene(t);last=t}requestAnimationFrame(loop)}
 if(!still)requestAnimationFrame(loop);
 
 function pastRuns(){
@@ -810,6 +874,7 @@ function pastRuns(){
 // ---------- Pixel cave entrances on the map (64×44, scaled up crisp)
 function seeded(k){return ()=>(k=(k*16807)%2147483647)/2147483647}
 function drawCave(cv,t){
+  if(useArt(cv,cv.dataset.type))return;
   const c=cv.getContext("2d"),type=cv.dataset.type,seed=+cv.dataset.seed||7,r=seeded(seed*97+13);
   const P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0)};
   const W=64,H=44,FY=37,cx=32,boss=type==="boss",mw=boss?17:13,top=boss?9:13;
@@ -863,9 +928,73 @@ function drawCave(cv,t){
     if(!blink){glow(cx-5,FY-15,4,"#8a4cff",.25,true);glow(cx+4,FY-15,4,"#8a4cff",.25,true);P(cx-6,FY-16,3,2,"#b48cff");P(cx+3,FY-16,3,2,"#b48cff")}
   }
 }
+// ---------- Base camp scene (192×108): a merchant pavilion with travelers' tents behind it
+let CAMPBG=null;
+const CAMP_TENTS=[
+  {x:153,top:53,base:68,half:7,col:"#7a4a8c"},{x:171,top:51,base:68,half:7,col:"#3f5f9f"},{x:188,top:54,base:68,half:6,col:"#5a7a3a"},
+  {x:163,top:64,base:90,half:13,col:"#9a5a2c"},{x:186,top:68,base:93,half:11,col:"#8c3f4a"}];
+function drawCampScene(t){
+  if(!document.getElementById)return;const cv=document.getElementById("campscene");if(!cv)return;
+  if(useArt(cv,"camp"))return;
+  const c=cv.getContext("2d"),P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0)},T=still?0:t;
+  const glow=(gx,gy,rad,col,a)=>{c.fillStyle=col;for(let y=Math.floor(gy-rad);y<=gy+rad;y++)for(let x=Math.floor(gx-rad);x<=gx+rad;x++){const d=Math.hypot(x-gx,y-gy);if(d>rad)continue;
+    if(d<rad*.5){c.globalAlpha=a;c.fillRect(x,y,1,1)}else if((x+y)%2===0){c.globalAlpha=a*.6;c.fillRect(x,y,1,1)}}c.globalAlpha=1};
+  if(!CAMPBG){
+    CAMPBG=document.createElement("canvas");CAMPBG.width=192;CAMPBG.height=108;const b=CAMPBG.getContext("2d"),Q=(x,y,w,h,col)=>{b.fillStyle=col;b.fillRect(x|0,y|0,w|0,h|0)};const r=seeded(4242);
+    ["#0d0a17","#120e1f","#181229","#1e1630","#241a36"].forEach((col,i)=>Q(0,i*14,192,15,col));
+    for(let i=0;i<40;i++)Q(r()*192,r()*40,1,1,r()<.3?"#d8d0f0":"#6b6390");
+    // cliff on the left with the Conungeon's mouth
+    for(let x=0;x<84;x++){const h=Math.round(16+x*.55+Math.sin(x/5)*3+r()*2);Q(x,h,1,74-h,"#2a2238");Q(x,h,1,1,"#3d3352")}
+    for(let i=0;i<70;i++)Q(r()*80,30+r()*40,2+r()*3,1,r()<.5?"#3a3150":"#1d1729");
+    for(let y=40;y<70;y++){const w=Math.round(Math.sqrt(Math.max(0,196-(Math.max(0,50-y))**2*1.6)));Q(30-w,y,w*2,1,"#050409")}
+    // far hills and the ridge where tents stand
+    for(let x=0;x<192;x++){const h=Math.round(58+Math.sin(x/13)*3);Q(x,h,1,16,x<84?"#1d1729":"#1a1527")}
+    // ground
+    Q(0,70,192,38,"#1c1724");for(let i=0;i<60;i++)Q(r()*192,72+r()*36,1+r()*3,1,r()<.5?"#2a2236":"#141019");
+    // travelers' tents, all to the right of the pavilion: small ones on the ridge, bigger ones up front
+    CAMP_TENTS.forEach(({x,top,base,half,col})=>{
+      for(let y=top;y<base;y++){const w=Math.round((y-top)/(base-top)*half);Q(x-w,y,w,1,col);Q(x,y,w,1,shade(col,.7))}
+      Q(x-half-1,base-1,1,1,shade(col,.5));Q(x+half,base-1,1,1,shade(col,.45));
+      const dt=top+Math.round((base-top)*.4),dw=Math.max(2,Math.round(half*.33));
+      for(let y=dt;y<base;y++){const w=Math.round((y-dt)/(base-dt)*dw);Q(x-w,y,w*2,1,"#3a2010")}
+      Q(x,top-3,1,3,"#5a3a24");Q(x+1,top-3,2,1,shade(col,1.3))});
+    // pavilion: posts, counter and goods (the canopy is drawn live so its lanterns can sway)
+    [[52,1],[140,1],[64,0],[128,0]].forEach(([x,front])=>Q(x,48,2,front?52:44,front?"#6b4a2a":"#4a321c"));
+    Q(56,84,80,14,"#5a3a24");Q(56,84,80,2,"#78502f");Q(56,96,80,2,"#3c2516");
+    for(let x=60;x<132;x+=12)Q(x,88,1,8,"#3c2516");
+    // merchant: a hooded figure behind the counter
+    Q(92,70,9,14,"#3a2f4f");Q(94,66,5,6,"#3a2f4f");Q(95,69,3,2,"#0b0911");Q(95,69,1,1,"#ffd25a");Q(97,69,1,1,"#ffd25a");
+    // tomes stacked on the counter
+    [["#6b3f8c",0],["#2f6f8c",1],["#8c6b2f",2],["#3f7f6a",3]].forEach(([col,k])=>{Q(112,82-k*2,12-k,2,col);Q(112,82-k*2,1,2,"#e8dcc0")});
+    Q(104,80,6,4,"#e8dcc0");Q(107,80,1,4,"#a39a7e"); // an open book
+    // a scroll rack on the right post
+    Q(142,62,6,1,"#78502f");Q(143,63,1,6,"#e8dcc0");Q(145,63,1,8,"#e8dcc0");Q(147,63,1,5,"#e8dcc0");
+  }
+  c.drawImage(CAMPBG,0,0);
+  // lanterns in the background tents breathe
+  CAMP_TENTS.forEach(({x,base,half},k)=>{const a=still?.25:.18+.1*Math.sin(T/600+k),big=half>9;glow(x,base-(big?6:4),big?6:4,"#ffb03b",a);P(x,base-(big?7:4),1,big?3:2,"#ffd25a")});
+  // canopy: striped, scalloped edge
+  for(let y=28;y<50;y++){const w=Math.round(14+(y-28)*1.95);for(let x=96-w;x<96+w;x++){const st=((x-96+64)>>3)%2;P(x,y,1,1,st?(x<96?"#e8dcc0":"#b9ad92"):(x<96?"#b8473a":"#8c3a30"))}}
+  for(let x=53;x<140;x++){const sc=(x-53)%8<4?1:0;P(x,50,1,1+sc,((x-53)>>2)%2?"#b9ad92":"#8c3a30")}
+  P(95,22,2,6,"#5a3a24");P(97,22,5,3,"#ffd25a");
+  // hanging lanterns sway
+  [[58,0],[134,1.4],[96,2.6]].forEach(([x,o])=>{const sw=still?0:Math.round(Math.sin(T/500+o)),f=still?0:Math.sin(T/130+o*3);
+    P(x,51,1,4,"#5a3a24");glow(x+sw,58,9+(f>0?1:0),"#ffb03b",.14);P(x-1+sw,55,3,4,"#ffb03b");P(x+sw,56,1,2,"#fff2b0")});
+  // potions on the counter twinkle
+  [[62,"#e0473b"],[67,"#4b7bff"],[72,"#3fc77a"],[77,"#c25bff"],[82,"#e0473b"]].forEach(([x,col],k)=>{
+    P(x,78,3,6,col);P(x+1,76,1,2,"#9d93b8");P(x+1,75,1,1,"#8a5a34");if(!still&&((T/260+k*1.7)%6)<1)P(x,78,1,1,"#ffffff")});
+  // campfire in front, with sparks
+  const fx=148,fy=101,f=still?0:Math.sin(T/90)+Math.sin(T/37);
+  glow(fx,fy-4,14+(f>0?1:0),"#ff9a3a",.16);
+  P(fx-5,fy,11,2,"#5a3a24");P(fx-4,fy-1,9,1,"#78502f");P(fx-3,fy-5,7,4,"#ff6a2b");P(fx-2,fy-8-(f>0?1:0),5,4,"#ffb03b");P(fx-1,fy-9-(f>.8?1:0),2,3,"#fff2b0");
+  if(!still)for(let k=0;k<3;k++){const p=((T/900)+k/3)%1;P(fx-2+k*2+Math.round(Math.sin(p*9+k)*2),fy-10-p*22,1,1,p<.7?"#ffb03b":"#ff6a2b")}
+  // something watches from the cave mouth
+  if(!still&&((T/1000)%8)>.2){P(26,58,1,1,"#ff4a3a");P(31,58,1,1,"#ff4a3a")}
+}
 // ---------- Pixel tents at base camp (64×44)
 function shade(hex,k){const n=parseInt(hex.slice(1),16),f=v=>Math.max(0,Math.min(255,Math.round(v*k)));return "#"+[(n>>16)&255,(n>>8)&255,n&255].map(f).map(v=>v.toString(16).padStart(2,"0")).join("")}
 function drawTent(cv,t){
+  if(useArt(cv,cv.dataset.kind))return;
   const c=cv.getContext("2d"),kind=cv.dataset.kind,seed=+cv.dataset.seed||3,r=seeded(seed*31+7);
   const P=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x|0,y|0,w|0,h|0)};
   const W=64,H=44,GY=35,cx=32,T=still?0:t;
@@ -903,28 +1032,37 @@ function drawTents(t){if(!document.querySelectorAll)return;document.querySelecto
 function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>drawCave(cv,t))}
 function titleView(){
   const best=loadBest();
-  return `<section class="room title"><canvas class="scene" id="scene" width="192" height="108" role="img" aria-label="Pixel art: a dark cavern with a torchlit stone stairway leading down, potions on a ledge, a glowing relic on a pedestal, and eyes watching from the shadows"></canvas>
+  return `<section class="room title"><canvas class="scene" id="scene" width="192" height="108" role="img" aria-label="Pixel art: at night, a cave mouth has just burst out of a rocky mound, with torn-up earth, cracks and boulders around it, spilled potions, a half-buried relic, and eyes watching from inside"></canvas>
     <p class="label">A riddle roguelike</p><h1>Conungeon</h1>
-    <p>Every monster in the Conungeon is a question. Learn from the travelers at base camp, then answer trivia to fight your way down. Reach floor 100 to face its final guardian, or keep going to see how deep you can get.</p>
+    <p>Every monster in the Conungeon tests your wit and worth. Learn from the travelers at base camp, then answer trivia to fight your way down. Reach floor 100 to face its final guardian, or keep going to see how deep you can get.</p>
     <ul class="rules">
-      <li><b>Start at base camp.</b> Travelers each teach five questions. Get all five right for their blessing, and spend the gold you earn at the merchant.</li>
+      <li><b>Campsites save your progress.</b> Base camp and every campfire save your descent, so you can close the game and continue later. Falling ends the descent.</li>
+      <li><b>Start at base camp.</b> Travelers teach five questions at a time. Get all five right for their blessing, ×2 damage with that subject. Spend the gold you earn at the merchant.</li>
       <li><b>Pick an attack school</b> each turn. Hitting a foe's weakness doubles damage.</li>
       <li><b>Answer in 6 seconds</b> for a critical hit. Three correct in a row adds a streak bonus.</li>
       <li><b>Questions get harder</b> the deeper you go, and new monsters appear. A boss guards every fifth floor.</li>
       <li><b>Grow tougher</b> with every win: each monster raises your max HP, and bosses fully heal you. Campfires let you rest or train.</li>
-      <li><b>Collect relics and items.</b> Relics are passive and stack. Items go in a 4-slot pack. Keys 1–4 answer questions.</li>
+      <li><b>Collect relics and items.</b> Relics are passive and stack up to 10. Items go in an 8-slot pack, and copies stack up to 10 in a slot. Keys 1–4 answer questions.</li>
     </ul>
     ${pastRuns()}
     <p class="label">${statusLine()}${best?` · Deepest floor ${best}`:""}</p>
     ${(()=>{let d=null;try{d=localStorage.getItem("conungeon-trophy")}catch(e){}return d?`<div class="trophy"><span class="label">In your collection since ${d}</span><strong>The Trivial Relic of Inconsequence</strong><span class="muted">Bragging rights. Nothing more. Congratulations.</span></div>`:""})()}
     <p class="muted" style="font-size:14px">Questions from <a href="https://opentdb.com" style="color:inherit">Open Trivia DB</a> (CC BY-SA 4.0) and <a href="https://the-trivia-api.com" style="color:inherit">The Trivia API</a> (CC BY-NC 4.0).</p>
-    <button class="btn" data-a="start">Enter the Conungeon</button></section>`;
+    ${(()=>{const d=readSave();if(!d)return `<button class="btn" data-a="start">Go to base camp</button>`;
+      const when=new Date(d.savedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+      const card=`<div class="savecard"><span class="label">Saved descent · ${esc(when)}</span><strong>${esc(d.savedWhere)}</strong><span class="muted">Health ${d.hp} / ${d.maxHp} · Power ${d.power} · ${d.relics.length} relic${d.relics.length===1?"":"s"}${d.blessings&&d.blessings.length?` · ${d.blessings.length} blessing${d.blessings.length>1?"s":""}`:""}</span></div>`;
+      return confirmNew?`${card}<div class="confirm"><strong>Start a new descent?</strong><span class="muted">Your saved descent will be lost.</span><div class="row"><button class="btn" data-a="newok">Yes, start over</button><button class="btn ghost" data-a="newno">Keep my save</button></div></div>`
+        :`${card}<div class="row"><button class="btn" data-a="continue">Continue</button><button class="btn ghost" data-a="newgame">New descent</button></div>`})()}</section>`;
 }
 
 document.addEventListener("click",ev=>{
   const b=ev.target.closest("[data-a]");if(!b)return;
   const a=b.dataset.a,i=+b.dataset.i;
   if(a==="start")newRun();
+  else if(a==="continue")resumeGame();
+  else if(a==="newgame"){confirmNew=true;render()}
+  else if(a==="newno"){confirmNew=false;render()}
+  else if(a==="newok"){confirmNew=false;clearSave();newRun()}
   else if(a==="door")enterDoor(i);
   else if(a==="cat")chooseCat(b.dataset.c);
   else if(a==="ans")answer(S.q.opts[i]);
@@ -935,13 +1073,15 @@ document.addEventListener("click",ev=>{
     else{const h=Math.ceil(S.maxHp*.4);S.hp=Math.min(S.maxHp,S.hp+h);S.floorEvent="Rested at a campfire";S.log.unshift(`You rest by the fire and recover ${h} HP.`)}advance()}
   else if(a==="menu"){stopTimer();S=null;render();window.scrollTo&&scrollTo({top:0})}
   else if(a==="item")useItem(i);
+  else if(a==="manage"){S.managePack=!S.managePack;render()}
+  else if(a==="drop")dropItem(i);
   else if(a==="tent")openTent(i);
   else if(a==="lnext")lessonNext();
   else if(a==="camp"){S.screen="camp";S.phase=null;render()}
-  else if(a==="shop"){S.screen="shop";render()}
+  else if(a==="shop"){S.screen="camp";render()}
   else if(a==="buy")buy(b.dataset.id);
   else if(a==="descend")descend();
-  else if(a==="onward"){S.screen="map";S.endless=true;S.rewardOpts=offerRewards(3,false);S.rewardTitle="The Computaur's spare parts";S.rewardNote="Take one, then keep descending.";S.screen="reward";render()}
+  else if(a==="onward"){S.screen="map";S.endless=true;S.rewardOpts=offerRewards(3,false);S.rewardTitle="The Computaur's spare parts";S.rewardNote="Take one, then keep descending.";S.screen="reward";saveGame();render()}
 });
 document.addEventListener("keydown",ev=>{
   if(S&&S.screen==="lesson"&&S.phase==="ask"){const n=+ev.key;if(n>=1&&n<=4)answer(S.q.opts[n-1]);return}
