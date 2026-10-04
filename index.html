@@ -74,6 +74,7 @@ button.chip.item:hover{background:var(--slab-2)}
 .room{background:var(--slab);border:1px solid var(--line);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px}
 .doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .doors .door.boss{grid-column:1/-1}
+.doors .door.boss.opt{grid-column:auto}
 .campscene{display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges;background:#120e1c;border:4px solid #05040a;box-shadow:0 6px 0 #0008}
 .travelers{display:flex;flex-direction:column}
 .trav{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -166,6 +167,8 @@ button.chip.item:hover{background:var(--slab-2)}
 .relicrow>div{display:flex;flex-direction:column;gap:4px;min-width:0}
 .relicart{width:84px;height:84px;flex:none;image-rendering:pixelated;image-rendering:crisp-edges}
 .trophy strong{font-family:var(--display);font-size:24px;color:var(--gold);line-height:1.1}
+.dread{margin:4px 0 0;font-style:italic;color:var(--dim)}
+.dread.hi{color:#ffb0a0}
 .floors{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:15px}
 .floors li{display:grid;grid-template-columns:2.4em 1fr;gap:8px;padding:4px 0;border-bottom:1px dotted var(--line)}
 .floors li:last-child{border-bottom:0}
@@ -390,10 +393,15 @@ const tierFor=f=>f<=4?0:f<=8?1:f<=12?2:3;
 const BOSSES={5:["The Librarian Lich","L","hurls a very heavy tome"],10:["Wyrm of a Thousand Riddles","D","breathes riddle-fire"]};
 const DEEP_BOSSES=[["The Bone Archivist","B","files you under Wrong"],["Hollow Oracle","O","foresaw that. It still hurts"],["Sphinx of Ash","X","pounces. Wrong answers are its favorite meal"],["Keeper of Lost Names","K","forgets your name, and some of your HP"]];
 // Bosses on floors 5, 10 and 13, then every 5 floors past 13
-const isBoss=f=>f%5===0;
+// Bosses arrive at random. After each boss there's a short lull, then the chance of meeting the next one
+// rises every floor until it's guaranteed. When the odds roll in your favor, the boss appears as an optional door.
+const isBoss=f=>f===GOAL;
+const BOSS_MIN_GAP=3, BOSS_MAX_GAP=8;
+const dread=()=>{const n=S.since||0;return n>=BOSS_MAX_GAP?1:n<BOSS_MIN_GAP?0:Math.min(1,(n-BOSS_MIN_GAP+1)*.18)};
 // Floor 100 is the goal. Its guardian is no monster at all.
 const GOAL=100, COMPUTAUR=["The Super Computaur","Ψ","calculates your wrong answer to four hundred decimal places"];
-const bossFor=f=>f===GOAL?COMPUTAUR:BOSSES[f]||DEEP_BOSSES[(f/5-3)%DEEP_BOSSES.length];
+const BOSS_ORDER=[BOSSES[5],BOSSES[10]];
+const bossFor=f=>{if(f===GOAL)return COMPUTAUR;const k=S.bossCount||0;return k<BOSS_ORDER.length?BOSS_ORDER[k]:DEEP_BOSSES[(k-BOSS_ORDER.length)%DEEP_BOSSES.length]};
 // Relics are passive and stack: take the same one twice and its effect doubles. They never use a pack slot.
 const RELICS=[
  {id:"quill",n:"Sharp Quill",d:"+3 damage on every hit"},
@@ -499,10 +507,14 @@ function newRun(){
   S.camp=makeCamp();render();
 }
 function makeDoors(){
-  if(isBoss(S.floor)) return [{t:"boss"}];
+  if(S.floor===GOAL) return [{t:"boss"}];
   const pool=["fight","fight","fight","elite","rest","treasure"];
   if(S.floor===1) return [{t:"fight"},{t:"fight"}];
-  const d=new Set();while(d.size<3)d.add(pick(pool));return [...d].map(t=>({t}));
+  const calm=S.floor>=GOAL-2&&S.floor<GOAL; // keep floors 98-99 clear for the Computaur
+  if(!calm&&dread()>=1) return [{t:"boss"}];
+  const d=new Set();while(d.size<3)d.add(pick(pool));const doors=[...d].map(t=>({t}));
+  if(!calm&&Math.random()<dread())doors.splice(rnd(3),1,{t:"boss",opt:true});
+  return doors;
 }
 
 // ---------- Questions
@@ -557,16 +569,16 @@ function enterDoor(i){
   startFight(t);
 }
 function startFight(t){
-  const f=S.floor, boss=t==="boss", elite=t==="elite";
+  const f=S.floor, boss=t==="boss", elite=t==="elite", optional=boss&&S.doors.some(d=>d.t==="boss"&&d.opt);
   const tier=tierFor(f), mix=tier===3&&Math.random()<.4?TIERS[2]:TIERS[tier];
   const [n,g,hit]=boss?bossFor(f):pick(mix);
   // Monsters keep getting tougher the deeper you go, so every run has a natural limit.
   let hp=10+f*6+Math.floor(f*f/4), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/35);
   if(f>GOAL){const k=1+(f-GOAL)*.03;hp=Math.round(hp*k);atk=Math.round(atk*k)}
   if(elite){hp=Math.round(hp*1.5);atk+=2}
-  if(boss){hp=f===5?60:f===10?120:Math.round(hp*2.2);atk+=3}
+  if(boss){hp=Math.round(hp*(1.35+Math.min(.85,Math.max(0,(f-10)*.05))));atk+=3}
   const cats=shuffle(available());
-  S.enemy={n:(elite?"Elite ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0};
+  S.enemy={n:(elite?"Elite ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0,optional};
   S.screen="battle";S.phase="choose";S.offer=shuffle(available()).slice(0,3);
   if(!S.offer.includes(S.enemy.weak)&&Math.random()<.5)S.offer[0]=S.enemy.weak;
   S.offer=shuffle(S.offer);
@@ -622,6 +634,8 @@ function nextTurn(){
     S.log.unshift(`${esc(e.n)} falls. +1 power, +${gain} max HP${e.boss?", and you're fully healed":""}.`);
     if(e.boss&&S.floor===GOAL&&!S.won){S.won=true;S.floorEvent="Defeated The Super Computaur (boss) · won the Trivial Relic of Inconsequence";try{localStorage.setItem("conungeon-trophy",new Date().toISOString().slice(0,10))}catch(x){}endRun(true);return}
     S.floorEvent=`Defeated ${e.n.replace(/^Elite /,"")}${e.boss?" (boss)":e.elite?" (elite)":""}`;
+    if(e.boss){S.since=0;S.bossCount=(S.bossCount||0)+1;
+      if(e.optional){const pool=RELICS.filter(r=>cnt(r.id)<RELIC_MAX);if(pool.length){const r=pick(pool);S.relics.push(r.id);if(r.id==="tome"){S.maxHp+=10;S.hp+=10}S.log.unshift(`You faced the guardian before it came for you. Bonus relic: ${r.n}.`);S.floorEvent+=` · bonus ${r.n}`}}}
     S.rewardOpts=offerRewards(3,false);S.rewardTitle="Spoils";S.rewardNote="Take one.";S.screen="reward";render();return;
   }
   S.phase="choose";
@@ -644,7 +658,7 @@ function takeReward(i){
   advance();
 }
 // ---------- Run log: one line per floor cleared, plus saved history of past runs
-function advance(){S.floorLog.push({f:S.floor,t:[S.hzNote,S.floorEvent].filter(Boolean).join(" · ")||"Passed through"});S.hzNote="";S.floorEvent="";S.floor++;S.doors=makeDoors();S.screen="map";render()}
+function advance(){S.since=(S.since||0)+1;S.floorLog.push({f:S.floor,t:[S.hzNote,S.floorEvent].filter(Boolean).join(" · ")||"Passed through"});S.hzNote="";S.floorEvent="";S.floor++;S.doors=makeDoors();S.screen="map";render()}
 function useItem(i){
   const slot=packItems()[i];if(!slot)return;const id=slot.id;
   if(id==="potion"){if(S.hp>=S.maxHp)return;const h=Math.max(12,Math.round(S.maxHp*.3));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You drink a Healing Draught. +${h} HP.`)}
@@ -753,8 +767,9 @@ function render(){
       <div style="min-width:0"><p class="label">${esc(t.cat)}</p><h2>${esc(t.name)} the ${esc(t.title)}</h2></div></div>
       ${L.k===0&&S.phase==="ask"&&!t.lessons?`<p class="speech">${esc(t.line)}</p>`:""}${main}</section>`;
   }else if(S.screen==="map"){
-    body=`<section class="room"><div><p class="label">Floor ${S.floor}${depths()?" · the Depths":""}</p><h2>${S.floor===GOAL?"Something hums behind this door":isBoss(S.floor)?"A great door stands alone":depths()?"The ground shifts underfoot":"Choose a passage"}</h2>${depths()?`<p class="muted">Past floor ${GOAL}, nothing is stable. Crevasses open without warning, and boulders bury the campfires and reliquaries. Victories here restore some health.</p>`:""}</div>
-      <div class="doors">${S.doors.map((d,i)=>{let [g,n,s]=ROOM[d.t];if(depths()&&(d.t==="rest"||d.t==="treasure"))s="Buried under a boulder";return `<button class="door ${d.t}" data-a="door" data-i="${i}"><canvas class="cave" width="64" height="44" data-type="${d.t}" data-seed="${S.floor*7+i+1}" ${depths()&&(d.t==="rest"||d.t==="treasure")?'data-buried="1"':""} aria-hidden="true"></canvas><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
+    body=`<section class="room"><div><p class="label">Floor ${S.floor}${depths()?" · the Depths":""}</p><h2>${S.floor===GOAL?"Something hums behind this door":S.doors.length===1&&S.doors[0].t==="boss"?"A great door stands alone":depths()?"The ground shifts underfoot":"Choose a passage"}</h2>${(()=>{if(S.floor===GOAL)return "";const lone=S.doors.length===1&&S.doors[0].t==="boss",opt=S.doors.some(d=>d.opt),dr=dread();
+      return lone?`<p class="dread hi">The dread has caught up with you. There's no way around this one.</p>`:opt?`<p class="dread hi">A guardian's lair opens among the passages. Face it now for a bonus relic, or slip past while you can.</p>`:dr>=.5?`<p class="dread hi">The walls tremble. Something enormous is close.</p>`:dr>0?`<p class="dread">Something heavy breathes nearby.</p>`:""})()}${depths()?`<p class="muted">Past floor ${GOAL}, nothing is stable. Crevasses open without warning, and boulders bury the campfires and reliquaries. Victories here restore some health.</p>`:""}</div>
+      <div class="doors">${S.doors.map((d,i)=>{let [g,n,s]=ROOM[d.t];if(d.opt){n="Guardian's lair";s="Optional boss · bonus relic"}if(depths()&&(d.t==="rest"||d.t==="treasure"))s="Buried under a boulder";return `<button class="door ${d.t}${d.opt?" opt":""}" data-a="door" data-i="${i}"><canvas class="cave" width="64" height="44" data-type="${d.t}" data-seed="${S.floor*7+i+1}" ${depths()&&(d.t==="rest"||d.t==="treasure")?'data-buried="1"':""} aria-hidden="true"></canvas><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
   }else if(S.screen==="rest"){
     const h=Math.min(S.maxHp-S.hp,Math.ceil(S.maxHp*.4));
     body=`<section class="room"><p class="label">Campfire · <span class="saved">progress saved</span></p><h2>A moment by the fire</h2><p class="muted">Your descent is saved here. If you close the game, you'll wake up by this fire.</p>
@@ -1130,7 +1145,7 @@ function titleView(){
       <li><b>Start at base camp.</b> Travelers teach five questions at a time. Get all five right for their blessing, ×2 damage with that subject. Spend the gold you earn at the merchant.</li>
       <li><b>Pick an attack school</b> each turn. Hitting a foe's weakness doubles damage.</li>
       <li><b>Answer in 6 seconds</b> for a critical hit. Three correct in a row adds a streak bonus.</li>
-      <li><b>Questions get harder</b> the deeper you go, and new monsters appear. A boss guards every fifth floor.</li>
+      <li><b>Questions get harder</b> the deeper you go, and new monsters appear. Bosses lurk at random: when the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic.</li>
       <li><b>Grow tougher</b> with every win: each monster raises your max HP, and beating a boss fully heals you. Campfires let you rest.</li>
       <li><b>Choose your passage wisely.</b> Every passage takes you one floor deeper. Rest at a campfire and you skip that floor's monster or reliquary, along with the relics, items and strength it would have given you. Only rest when you really need to.</li>
       <li><b>Collect relics and items.</b> Relics are passive and stack up to 10. Items go in an 8-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>
