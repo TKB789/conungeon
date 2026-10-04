@@ -54,6 +54,12 @@ button.slot:hover{background:var(--slab-2)}
 .slot .x{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--blood)}
 .kitright{display:flex;gap:10px;align-items:center}
 .linkbtn{background:none;border:0;padding:0;color:var(--torch);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;cursor:pointer;text-decoration:underline}
+.slots{position:relative;z-index:0}
+.slot.help{border-color:#ffd25a;color:#ffe9a8;box-shadow:0 0 10px 2px rgba(255,210,90,.45);animation:halo 1.6s ease-in-out infinite}
+.slot.help::after{content:"";position:absolute;inset:-10px;border-radius:14px;background:radial-gradient(closest-side,rgba(255,210,90,.35),rgba(255,210,90,0));filter:blur(5px);z-index:-1;pointer-events:none;animation:mist 2.4s ease-in-out infinite}
+@keyframes halo{50%{box-shadow:0 0 18px 6px rgba(255,210,90,.6)}}
+@keyframes mist{50%{transform:scale(1.15);opacity:.55}}
+.danger{font-size:14px;color:#ffd0c8;background:rgba(207,84,68,.18);border:1px solid var(--blood);border-radius:6px;padding:6px 10px}
 .slot.empty{border:1px dashed var(--line);color:var(--dim);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
 .relics{display:flex;flex-wrap:wrap;gap:6px}
 .chip b{font-family:var(--mono);font-size:12px}
@@ -342,7 +348,7 @@ async function liveInit(){
 }
 function statusLine(){
   if(LIVE.state==="daily")return `Full archive loaded · ${LIVE.count.toLocaleString("en-US")} questions`;
-  return {loading:"Gathering questions…",live:`Live questions · ${(LIVE.pool.e.length+LIVE.pool.m.length+LIVE.pool.h.length).toLocaleString("en-US")} loaded so far`,offline:"Offline · built-in question bank"}[LIVE.state];
+  return {loading:"Gathering questions…",live:`Live questions · ${(LIVE.pool.e.length+LIVE.pool.m.length+LIVE.pool.h.length).toLocaleString("en-US")} loaded so far`,offline:"Sample questions only · your live site loads the full archive"}[LIVE.state];
 }
 // Keep pulling new batches in the background (one request every ~6 seconds) until the API runs dry.
 async function grow(){
@@ -476,10 +482,12 @@ function buy(id){
   S.gold-=w.cost;S.log.unshift(`You buy a ${w.n} for ${w.cost} gold.`);render();
 }
 function descend(){
-  const done=S.camp.tents.filter(t=>t.done).length;
+  const done=S.camp.tents.filter(t=>t.lessons).length;
   S.floorLog.push({f:"Camp",t:done?`Learned from ${done} traveler${done>1?"s":""}${S.blessings.length?` · ${S.blessings.length} blessing${S.blessings.length>1?"s":""}`:""}`:"Went straight in"});
   if(S.gold>0)S.log.unshift(`You leave ${S.gold} gold with the merchant. "For when you come back," they say.`);
-  S.gold=0;S.screen="map";S.doors=makeDoors();S.log.unshift("You descend into the Conungeon. Torchlight flickers on the stairs.");render();
+  // Once inside, there's no way back to base camp until you fall. The entrance campfire is the first save.
+  S.gold=0;S.inside=true;S.screen="map";S.doors=makeDoors();S.log.unshift("You descend into the Conungeon. Behind you, the entrance rumbles shut. A small campfire burns at the bottom of the stairs.");
+  saveGame("The entrance campfire");render();
 }
 function newRun(){
   rollDay();
@@ -624,9 +632,9 @@ function useItem(i){
 }
 const RUNS_KEY="conungeon-runs";
 function loadRuns(){try{return JSON.parse(localStorage.getItem(RUNS_KEY)||"[]")}catch(e){return []}}
-function recordRun(win){
+function recordRun(win,left){
   const acc=S.asked?Math.round(S.correct/S.asked*100):0;
-  const last=win?{f:S.floor,t:"Defeated The Super Computaur",end:true,good:true}:{f:S.floor,t:`Fell to ${S.killer||"the dark"}`,end:true};
+  const last=win?{f:S.floor,t:"Defeated The Super Computaur",end:true,good:true}:left?{f:S.floor,t:"Left the Conungeon",end:true}:{f:S.floor,t:`Fell to ${S.killer||"the dark"}`,end:true};
   const run={id:S.runId,date:new Date().toISOString().slice(0,10),floor:S.floor,won:!!S.won,cleared:S.floorLog.length,acc,streak:S.bestStreak,log:[...S.floorLog,last]};
   const runs=loadRuns().filter(r=>r.id!==run.id);runs.unshift(run);
   try{localStorage.setItem(RUNS_KEY,JSON.stringify(runs.slice(0,25)))}catch(e){}
@@ -635,27 +643,33 @@ function floorList(log){return `<ol class="floors">${log.map(x=>`<li class="${x.
 // ---------- Saving: campsites (base camp and every campfire) save your descent in this browser
 const SAVE_KEY="conungeon-save";
 let confirmNew=false;
-function saveGame(){
-  if(!S)return;const where=S.screen==="rest"?`Campfire on floor ${S.floor}`:S.screen==="reward"?`Past the Super Computaur, floor ${S.floor}`:"Base camp";
+function saveGame(label){
+  if(!S)return;if(S.inside&&S.screen==="camp")return;
+  const where=label||(S.screen==="rest"?`Campfire on floor ${S.floor}`:S.screen==="reward"?`Past the Super Computaur, floor ${S.floor}`:"Base camp");
   try{localStorage.setItem(SAVE_KEY,JSON.stringify({...S,q:null,lesson:null,enemy:null,offer:null,phase:null,managePack:false,picked:null,
-    screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,6),savedAt:Date.now(),savedWhere:where}))}catch(e){}
+    confirmDescend:false,screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,6),savedAt:Date.now(),savedWhere:where}))}catch(e){}
 }
 function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY)||"null");return d&&d.screen?d:null}catch(e){return null}}
 function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
-function resumeGame(){const d=readSave();if(!d)return;stopTimer();S=d;S.best=loadBest();S.log.unshift(`You return to ${d.savedWhere.toLowerCase().startsWith("base")?"base camp":"the "+d.savedWhere.toLowerCase()}. Welcome back.`);render();window.scrollTo&&scrollTo({top:0})}
+function abandonDescent(){const d=readSave();if(d&&d.inside){S=d;recordRun(false,true);if(S.floor>loadBest())saveBest(S.floor)}S=null;clearSave();newRun()}
+function resumeGame(){const d=readSave();if(!d)return;stopTimer();S=d;S.best=loadBest();
+  S.log.unshift(d.inside?`You wake by ${d.savedWhere.toLowerCase().startsWith("the ")?d.savedWhere.toLowerCase():"the "+d.savedWhere.toLowerCase()}. The Conungeon hasn't let you go.`:"You return to base camp. The travelers wave you back over.");render();window.scrollTo&&scrollTo({top:0})}
 function endRun(win){
   stopTimer();S.screen=win?"win":"dead";recordRun(win);clearSave();
   const reached=S.floor;if(reached>S.best){S.best=reached;saveBest(reached)}render();
 }
 
 // ---------- Render
-const ROOM={fight:["x","Monster","A foe for your wits"],elite:["X","Elite","Harder questions, better spoils"],rest:["~","Campfire","Rest or train"],treasure:["$","Reliquary","Claim a relic"],boss:["&","Boss","Guardian of the floor"]};
+const ROOM={fight:["x","Monster","A foe for your wits"],elite:["X","Elite","Harder questions, better spoils"],rest:["~","Campfire","Rest, but skip this floor's spoils"],treasure:["$","Reliquary","Claim a relic"],boss:["&","Boss","Guardian of the floor"]};
 function hud(){
   const P=packItems(),full=P.length>=MAX_ITEMS,manage=!!S.managePack;
+  // In danger (low health, or the next hit could knock you out), items that can help glow.
+  const e=S.screen==="battle"?S.enemy:null,lethal=!!(e&&e.hp>0&&!S.ward&&hitFor(e)>=S.hp),low=S.hp<=S.maxHp*.35,danger=!!e&&(lethal||low)&&!manage;
+  const helps=id=>danger&&(id==="potion"?S.hp<S.maxHp:id==="ward"?lethal&&!S.ward:(id==="halve"||id==="glass")?S.phase==="ask":false);
   const slots=Array.from({length:MAX_ITEMS},(_,i)=>{const sl=P[i];if(!sl)return `<span class="slot empty">Empty</span>`;
     const it=ITEMS.find(x=>x.id===sl.id);
     return manage?`<button class="slot drop" data-a="drop" data-i="${i}" aria-label="Drop ${esc(it.n)}">${esc(it.n)}${sl.n>1?`<b>×${sl.n}</b>`:""}<span class="x">Drop</span></button>`
-      :`<button class="slot" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
+      :`<button class="slot${helps(sl.id)?" help":""}" data-a="item" data-i="${i}" title="${esc(it.d)}">${esc(it.n)}${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
   const relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.d)}${k>1?` (×${k})`:""}">${esc(r.n)}${k>1?` <b>×${k}</b>`:""}</span>`}).join("");
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label">Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
@@ -664,6 +678,7 @@ function hud(){
     ${["camp","lesson","shop"].includes(S.screen)?`<div class="floor"><div class="label">Gold</div><b>${S.gold}</b></div>`:`<div class="floor"><div class="label">Floor</div><b>${S.floor}</b>${S.floor<=GOAL&&!S.won?`<span class="muted num"> /${GOAL}</span>`:""}</div>`}
     <div class="kit">
       <div class="kithead"><span class="label">Pack</span><span class="kitright"><span class="label ${full?"full":""}">${P.length} / ${MAX_ITEMS}${full?" · full":""}</span>${P.length?`<button class="linkbtn" data-a="manage">${manage?"Done":"Drop items"}</button>`:""}</span></div>
+      ${danger?`<div class="danger">${lethal?"Danger! The next hit could knock you out.":"Danger! Your health is low."}${P.some(sl=>helps(sl.id))?" Glowing items can help.":""}</div>`:""}
       <div class="slots">${slots}</div>
       ${relics||S.blessings.length||S.won?`<div class="kithead"><span class="label">Relics · passive, stack to 10</span></div><div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 damage with ${esc(c)}">${esc(TITLES[c]||"Sage")}'s Blessing</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">Trivial Relic of Inconsequence</span>`:""}</div>`:""}
     </div>
@@ -688,7 +703,8 @@ function render(){
       <p class="muted">They're curious about the Conungeon and want to learn with you. Each lesson is five questions. Get all five right for the traveler's blessing: ×2 damage with their subject for this descent. You can carry ${MAX_BLESSINGS} blessings.</p></div>
       <div class="travelers">${T.map((t,i)=>{const b=S.blessings.includes(t.cat);
         return `<div class="trav"><span class="mono" style="background:${t.color}">${esc(t.name[0])}</span><div style="min-width:0"><strong>${esc(t.name)} the ${esc(t.title)}</strong><p class="muted">${esc(t.cat)} · ${b?`<span class="blessed">Blessed ×2</span>`:t.lessons?`${t.lessons} lesson${t.lessons>1?"s":""}, best ${t.best} of 5`:"Hasn't met you yet"}</p></div><button class="btn ghost" data-a="tent" data-i="${i}">${t.lessons?"Learn more":"Learn"}</button></div>`}).join("")}</div>
-      <div class="row" style="justify-content:space-between"><button class="btn ghost" data-a="menu">Back to title</button><button class="btn" data-a="descend">Descend into the Conungeon</button></div></section>`;
+      <div class="row" style="justify-content:space-between"><button class="btn ghost" data-a="menu">Back to title</button><button class="btn" data-a="askdescend">Descend into the Conungeon</button></div>
+      ${S.confirmDescend?`<div class="confirm"><strong>Ready to go in?</strong><span class="muted">Once you enter the Conungeon, there's no coming back to base camp until you're knocked out. Get what you need now${S.gold?`: ${S.gold} unspent gold stays with the merchant`:""}. You'll find more potions and relics as you go deeper.</span><div class="row"><button class="btn" data-a="descend">Enter the Conungeon</button><button class="btn ghost" data-a="notyet">Not yet</button></div></div>`:""}</section>`;
   }else if(S.screen==="lesson"){
     const L=S.lesson,t=S.camp.tents[L.tent],q=S.q,done=S.phase!=="ask";
     const dots=LESSON.map((_,k)=>`<i class="${k<L.k||(k===L.k&&done)?"on":""} ${k===L.k?"now":""}"></i>`).join("");
@@ -718,9 +734,8 @@ function render(){
       <div class="doors">${S.doors.map((d,i)=>{const [g,n,s]=ROOM[d.t];return `<button class="door ${d.t}" data-a="door" data-i="${i}"><canvas class="cave" width="64" height="44" data-type="${d.t}" data-seed="${S.floor*7+i+1}" aria-hidden="true"></canvas><strong>${n}</strong><small>${s}</small></button>`}).join("")}</div></section>`;
   }else if(S.screen==="rest"){
     const h=Math.min(S.maxHp-S.hp,Math.ceil(S.maxHp*.4));
-    body=`<section class="room"><p class="label">Campfire · <span class="saved">progress saved</span></p><h2>A moment by the fire</h2><p class="muted">Your descent is saved here. You can close the game and pick up from this fire later. Choose one, then descend.</p>
-      <div class="rewards"><button class="reward" data-a="rest" data-v="heal"><span class="label">Rest</span><strong>Heal ${h} HP</strong><span class="muted">Recover 40% of your max HP.</span></button>
-      <button class="reward it" data-a="rest" data-v="train"><span class="label">Train</span><strong>+8 max HP</strong><span class="muted">Grow tougher for the floors below. Also heals 8.</span></button></div></section>`;
+    body=`<section class="room"><p class="label">Campfire · <span class="saved">progress saved</span></p><h2>A moment by the fire</h2><p class="muted">Your descent is saved here. If you close the game, you'll wake up by this fire.</p>
+      <div class="rewards"><button class="reward" data-a="rest" data-v="heal"><span class="label">Rest, then descend</span><strong>${h>0?`Heal ${h} HP`:"You're already at full health"}</strong><span class="muted">Recover 40% of your max HP.</span></button></div></section>`;
   }else if(S.screen==="reward"){
     body=`<section class="room"><p class="label">${esc(S.rewardNote)}</p><h2>${esc(S.rewardTitle)}</h2>
       <div class="rewards">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&!canAdd(r.id);
@@ -1036,13 +1051,14 @@ function titleView(){
     <p class="label">A riddle roguelike</p><h1>Conungeon</h1>
     <p>Every monster in the Conungeon tests your wit and worth. Learn from the travelers at base camp, then answer trivia to fight your way down. Reach floor 100 to face its final guardian, or keep going to see how deep you can get.</p>
     <ul class="rules">
-      <li><b>Campsites save your progress.</b> Base camp and every campfire save your descent, so you can close the game and continue later. Falling ends the descent.</li>
+      <li><b>No turning back.</b> Prepare at base camp, because once you enter the Conungeon you can't return until you're knocked out. Campfires inside save your progress, and you'll wake at the last one you reached.</li>
       <li><b>Start at base camp.</b> Travelers teach five questions at a time. Get all five right for their blessing, ×2 damage with that subject. Spend the gold you earn at the merchant.</li>
       <li><b>Pick an attack school</b> each turn. Hitting a foe's weakness doubles damage.</li>
       <li><b>Answer in 6 seconds</b> for a critical hit. Three correct in a row adds a streak bonus.</li>
       <li><b>Questions get harder</b> the deeper you go, and new monsters appear. A boss guards every fifth floor.</li>
-      <li><b>Grow tougher</b> with every win: each monster raises your max HP, and bosses fully heal you. Campfires let you rest or train.</li>
-      <li><b>Collect relics and items.</b> Relics are passive and stack up to 10. Items go in an 8-slot pack, and copies stack up to 10 in a slot. Keys 1–4 answer questions.</li>
+      <li><b>Grow tougher</b> with every win: each monster raises your max HP, and beating a boss fully heals you. Campfires let you rest.</li>
+      <li><b>Choose your passage wisely.</b> Every passage takes you one floor deeper. Rest at a campfire and you skip that floor's monster or reliquary, along with the relics, items and strength it would have given you. Only rest when you really need to.</li>
+      <li><b>Collect relics and items.</b> Relics are passive and stack up to 10. Items go in an 8-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>
     </ul>
     ${pastRuns()}
     <p class="label">${statusLine()}${best?` · Deepest floor ${best}`:""}</p>
@@ -1050,9 +1066,11 @@ function titleView(){
     <p class="muted" style="font-size:14px">Questions from <a href="https://opentdb.com" style="color:inherit">Open Trivia DB</a> (CC BY-SA 4.0) and <a href="https://the-trivia-api.com" style="color:inherit">The Trivia API</a> (CC BY-NC 4.0).</p>
     ${(()=>{const d=readSave();if(!d)return `<button class="btn" data-a="start">Go to base camp</button>`;
       const when=new Date(d.savedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-      const card=`<div class="savecard"><span class="label">Saved descent · ${esc(when)}</span><strong>${esc(d.savedWhere)}</strong><span class="muted">Health ${d.hp} / ${d.maxHp} · Power ${d.power} · ${d.relics.length} relic${d.relics.length===1?"":"s"}${d.blessings&&d.blessings.length?` · ${d.blessings.length} blessing${d.blessings.length>1?"s":""}`:""}</span></div>`;
-      return confirmNew?`${card}<div class="confirm"><strong>Start a new descent?</strong><span class="muted">Your saved descent will be lost.</span><div class="row"><button class="btn" data-a="newok">Yes, start over</button><button class="btn ghost" data-a="newno">Keep my save</button></div></div>`
-        :`${card}<div class="row"><button class="btn" data-a="continue">Continue</button><button class="btn ghost" data-a="newgame">New descent</button></div>`})()}</section>`;
+      const card=`<div class="savecard"><span class="label">${d.inside?"Inside the Conungeon":"At base camp"} · saved ${esc(when)}</span><strong>${esc(d.savedWhere)}</strong><span class="muted">Health ${d.hp} / ${d.maxHp} · Power ${d.power} · ${d.relics.length} relic${d.relics.length===1?"":"s"}${d.blessings&&d.blessings.length?` · ${d.blessings.length} blessing${d.blessings.length>1?"s":""}`:""}</span></div>`;
+      if(d.inside)return confirmNew?`${card}<div class="confirm"><strong>Leave the Conungeon?</strong><span class="muted">Going to base camp ends this descent. Your progress at the ${esc(d.savedWhere.toLowerCase().replace(/^the /,""))} will be lost, and this descent ends at floor ${d.floor}.</span><div class="row"><button class="btn" data-a="newno">Stay in the Conungeon</button><button class="btn ghost" data-a="leaveok">Leave and go to base camp</button></div></div>`
+        :`${card}<div class="row"><button class="btn" data-a="continue">Resume at the campfire</button><button class="btn ghost" data-a="newgame">Go to base camp</button></div>`;
+      return confirmNew?`${card}<div class="confirm"><strong>Start camp over?</strong><span class="muted">Your gold, blessings and lessons at base camp will be lost.</span><div class="row"><button class="btn" data-a="newok">Yes, start over</button><button class="btn ghost" data-a="newno">Keep my camp</button></div></div>`
+        :`${card}<div class="row"><button class="btn" data-a="continue">Return to base camp</button><button class="btn ghost" data-a="newgame">Start over</button></div>`})()}</section>`;
 }
 
 document.addEventListener("click",ev=>{
@@ -1063,14 +1081,14 @@ document.addEventListener("click",ev=>{
   else if(a==="newgame"){confirmNew=true;render()}
   else if(a==="newno"){confirmNew=false;render()}
   else if(a==="newok"){confirmNew=false;clearSave();newRun()}
+  else if(a==="leaveok"){confirmNew=false;abandonDescent()}
   else if(a==="door")enterDoor(i);
   else if(a==="cat")chooseCat(b.dataset.c);
   else if(a==="ans")answer(S.q.opts[i]);
   else if(a==="next")nextTurn();
   else if(a==="reward")takeReward(i);
   else if(a==="advance")advance();
-  else if(a==="rest"){if(b.dataset.v==="train"){S.maxHp+=8;S.hp=Math.min(S.maxHp,S.hp+8);S.floorEvent="Trained at a campfire · +8 max HP";S.log.unshift("You train by the fire. +8 max HP.")}
-    else{const h=Math.ceil(S.maxHp*.4);S.hp=Math.min(S.maxHp,S.hp+h);S.floorEvent="Rested at a campfire";S.log.unshift(`You rest by the fire and recover ${h} HP.`)}advance()}
+  else if(a==="rest"){{const h=Math.ceil(S.maxHp*.4);S.hp=Math.min(S.maxHp,S.hp+h);S.floorEvent="Rested at a campfire";S.log.unshift(`You rest by the fire and recover ${h} HP.`)}advance()}
   else if(a==="menu"){stopTimer();S=null;render();window.scrollTo&&scrollTo({top:0})}
   else if(a==="item")useItem(i);
   else if(a==="manage"){S.managePack=!S.managePack;render()}
@@ -1080,7 +1098,9 @@ document.addEventListener("click",ev=>{
   else if(a==="camp"){S.screen="camp";S.phase=null;render()}
   else if(a==="shop"){S.screen="camp";render()}
   else if(a==="buy")buy(b.dataset.id);
-  else if(a==="descend")descend();
+  else if(a==="askdescend"){S.confirmDescend=true;render();const c=document.querySelector(".confirm");c&&c.scrollIntoView&&c.scrollIntoView({block:"center"})}
+  else if(a==="notyet"){S.confirmDescend=false;render()}
+  else if(a==="descend"){S.confirmDescend=false;descend()}
   else if(a==="onward"){S.screen="map";S.endless=true;S.rewardOpts=offerRewards(3,false);S.rewardTitle="The Computaur's spare parts";S.rewardNote="Take one, then keep descending.";S.screen="reward";saveGame();render()}
 });
 document.addEventListener("keydown",ev=>{
