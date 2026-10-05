@@ -717,6 +717,10 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 #app.run .meta{height:24px;flex:none;align-items:center;overflow:hidden}
 #app.run .meta .linkbtn{padding:0;line-height:1;border-bottom-width:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.lockform{display:flex;gap:8px;align-items:center}
+.lockform input{flex:1;min-width:0;font:inherit;font-family:var(--mono);font-size:24px;letter-spacing:.3em;padding:8px 12px;background:#0c0d0c;color:var(--parch);border:0;margin:6px;
+  box-shadow:0 -3px 0 0 #56604f,0 3px 0 0 #56604f,-3px 0 0 0 #56604f,3px 0 0 0 #56604f}
+.lockform input:focus{outline:none;box-shadow:0 -3px 0 0 var(--torch),0 3px 0 0 var(--torch),-3px 0 0 0 var(--torch),3px 0 0 0 var(--torch)}
 </style>
 </head>
 <body>
@@ -2878,15 +2882,20 @@ function lessonAnswer(opt){
   if(ok){L.score++;const g=GOLD_FOR[S.q.d];L.gold+=g;S.gold+=g}else S.missed.push({q:S.q.text,a:S.q.right});
   if(S.q.tip)S.log.unshift(tipLine(S.q));
   S.log.unshift(ok?`<span class="good">Correct.</span> +${GOLD_FOR[S.q.d]} gold.`:`<span class="bad">Not quite.</span> The answer is ${esc(S.q.right)}.`);
+  // last question: wrap up the lesson right away so Keep learning / Back to camp show without an extra step
+  if(L.k>=LESSON.length-1)finishLesson();
   render();
+}
+function finishLesson(){
+  const L=S.lesson,t=S.camp.tents[L.tent];if(L.finished)return;L.finished=true;
+  t.lessons++;t.best=Math.max(t.best,L.score);L.blessed=false;
+  if(L.score===LESSON.length&&!S.blessings.includes(t.cat)&&S.blessings.length<MAX_BLESSINGS){S.blessings.push(t.cat);L.blessed=true;S.log.unshift(`<b>Lesson complete: ${L.score} of 5.</b> ${t.name} the ${t.title} becomes your mentor: ×2 knowledge with ${t.cat}. You earn ${L.gold} gold.`)}
+  else S.log.unshift(`<b>Lesson complete: ${L.score} of 5.</b> ${L.score===LESSON.length&&S.blessings.includes(t.cat)?`Perfect again. ${t.name} is already your mentor, and proud of it.`:L.score===LESSON.length?`Perfect, but you already have ${MAX_BLESSINGS} mentors.`:`${t.name} the ${t.title} says: ${L.score>=3?"So close. Again?":"Come back and try again."}`} You earn ${L.gold} gold.`);
 }
 function lessonNext(){
   const L=S.lesson,t=S.camp.tents[L.tent];
   if(L.k<LESSON.length-1){L.k++;lessonQuestion();return}
-  t.lessons++;t.best=Math.max(t.best,L.score);L.blessed=false;
-  if(L.score===LESSON.length&&!S.blessings.includes(t.cat)&&S.blessings.length<MAX_BLESSINGS){S.blessings.push(t.cat);L.blessed=true;S.log.unshift(`${t.name} the ${t.title} becomes your mentor: ×2 knowledge with ${t.cat}.`)}
-  else S.log.unshift(`${t.name} the ${t.title}: ${L.score} of 5. You earn ${L.gold} gold.`);
-  S.phase="done";render();
+  finishLesson();S.phase="done";render();
 }
 // The merchant takes gold earned at camp. Gold can't be carried below, so spend it.
 const WARES=[
@@ -3160,7 +3169,7 @@ function footerView(){
   if(S.screen==="battle"){nav=S.phase==="result"?`<button class="btn" data-a="next" id="nextbtn">${S.hp<=0?"Fall":S.enemy.hp<=0?"Claim victory":"Continue"}</button>`:off("Continue")}
   else if(S.screen==="hazard"){nav=S.phase==="result"?`<button class="btn" data-a="hznext" id="nextbtn">${S.hp<=0?"Fall":"Press on"}</button>`:off("Press on")}
   else if(S.screen==="lesson"){
-    if(S.phase==="done")nav=`<button class="btn" data-a="tent" data-i="${S.lesson.tent}" id="nextbtn">Keep learning</button><button class="btn ghost" data-a="camp">Back to camp</button>`;
+    if(S.phase==="done"||S.lesson.finished)nav=`<button class="btn" data-a="tent" data-i="${S.lesson.tent}" id="nextbtn">Keep learning</button><button class="btn ghost" data-a="camp">Back to camp</button>`;
     else nav=S.phase==="result"?`<button class="btn" data-a="lnext" id="nextbtn">${S.lesson.k<LESSON.length-1?"Next question":"Finish the lesson"}</button>`:off("Next question");
     if(S.phase==="ask"&&S.lesson.k===0){const t=S.camp.tents[S.lesson.tent];pin=`<p class="speech">${esc(t.line)}</p>`}}
   else if(S.screen==="camp"&&(S.campView||"hub")==="hub"){
@@ -3682,9 +3691,14 @@ function drawDoors(t){if(!document.querySelectorAll)return;document.querySelecto
 const STORY_P=["One morning, strange portals tore open in the ground all over the world. Each one led down a deep, dark staircase, with a low rumble and hungry eyes glaring up from below.", "It took months for the world to agree on a plan, a new world record for agreeing on anything. Finally, a brave soul from every country stepped inside.", "They found monsters of every shape and size, all with an endless, terrible thirst for… knowledge?", "It turns out the portals lead to an interdimensional trivia bar. Twisting passages wind from den to den, where visitors from across the multiverse gather for trivia night. This season, for the very first time, the theme is Earth. Can you guess the bar's name? That's right: <b>the Conungeon</b>, the Dungeon of Conundrums.", "Why do they look so menacing? No idea. They don't judge your face, so don't judge theirs.", "They <i>do</i> judge your answers, though. Life is busy across a dozen dimensions, and trivia night is the one night they get with their friends. So when an actual Earthling sits down and doesn't know things about their own planet, it kind of harshes the vibe. <i>\"Oh, come ON. Do you even live on the surface?!\"</i>", "Answer well and they'll share gifts from beyond. Anger them too much and they'll knock you out cold and send you back up to the surface. On floor 100, the bar's Quizmaster, the Super Computaur, hosts the final round.", "Now curious minds from all over the world gather at the portal's mouth, trading notes and working up their courage. How deep will you dare to go?"];
 const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Pick a subject each turn. Right answers fill the bar, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. Lose all your health and they knock you out and send you back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Every passage takes you one floor deeper. Healing stones restore health, but you skip that floor's visitor and gifts.</li>\n        <li><b>Relics and items.</b> Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
 let titleSheet=null;
+// Analytics Conungeon: a passcode-gated link (remembered on this device once entered)
+const ANA_URL="analytics.html",ANA_CODE="1234";
+const anaOpen=()=>{try{return localStorage.getItem("ana-unlocked")==="1"}catch(e){return false}};
+document.addEventListener("submit",ev=>{if(!ev.target.classList||!ev.target.classList.contains("lockform"))return;ev.preventDefault();
+  const i=$("#pass"),m=$("#passmsg");if(i&&i.value===ANA_CODE){try{localStorage.setItem("ana-unlocked","1")}catch(e){}location.href=ANA_URL}else if(m){m.textContent="That's not it. Try again.";i.value="";i.focus()}});
 function titleSheetView(){
   if(!titleSheet)return "";
-  const body=titleSheet==="story"?`<h2>The story continues…</h2><div class="lorebody">${STORY_P.slice(3).map(x=>`<p>${x}</p>`).join("")}</div>`:titleSheet==="rules"?`<h2>How to play</h2><ul class="rules">${RULES_HTML}</ul>`:`<h2>Past descents</h2>${pastRuns()}`;
+  const body=titleSheet==="lock"?`<h2>Analytics Conungeon</h2><p class="muted">Enter the passcode to go in.</p><form class="lockform" autocomplete="off"><input id="pass" type="password" inputmode="numeric" maxlength="8" aria-label="Passcode" autofocus><button class="btn" type="submit">Enter</button></form><p class="bad" id="passmsg" aria-live="polite"></p>`:titleSheet==="story"?`<h2>The story continues…</h2><div class="lorebody">${STORY_P.slice(3).map(x=>`<p>${x}</p>`).join("")}</div>`:titleSheet==="rules"?`<h2>How to play</h2><ul class="rules">${RULES_HTML}</ul>`:`<h2>Past descents</h2>${pastRuns()}`;
   return `<div class="overlay" role="dialog"><div class="sheet">${body.replace(/^<h2>(.*?)<\/h2>/,(m,t)=>`<div class="sheethead"><h2>${t}</h2><button class="linkbtn closex" data-a="tsheet" data-v="" aria-label="Close">✕ Close</button></div>`)}</div></div>`;
 }
 function titleView(){
@@ -3692,7 +3706,7 @@ function titleView(){
   return `<section class="room title"><canvas class="scene" id="scene" width="192" height="108" role="img" aria-label="Pixel art: at night, a cave mouth has just burst out of a rocky mound, with torn-up earth, cracks and boulders around it, spilled potions, a half-buried relic, and eyes watching from inside"></canvas>
     <h1 class="tagline">A Trivial Roguelike</h1>
     <div class="intro1">${STORY_P.slice(0,3).map((x,i)=>`<p>${x}${i===2?` <button class="linkbtn inl" data-a="tsheet" data-v="story">Read more ›</button>`:""}</p>`).join("")}</div>
-    <div class="tlinks"><button class="linkbtn" data-a="tsheet" data-v="rules">How to play</button>${loadRuns().length?`<button class="linkbtn" data-a="tsheet" data-v="runs">Past descents</button>`:""}</div>
+    <div class="tlinks"><button class="linkbtn" data-a="tsheet" data-v="rules">How to play</button>${loadRuns().length?`<button class="linkbtn" data-a="tsheet" data-v="runs">Past descents</button>`:""}<button class="linkbtn" data-a="analytics">Analytics 🔒</button></div>
     <p class="label">${statusLine()}${best?` · Deepest floor ${best}`:""}</p>
     ${(()=>{let d=null;try{d=localStorage.getItem("conungeon-trophy")}catch(e){}return d?`<div class="trophy relicrow"><canvas class="relicart" width="32" height="32" role="img" aria-label="The Trivial Relic"></canvas><div><span class="label">In your collection since ${d}</span><strong>The Trivial Relic</strong></div></div>`:""})()}
 </section>`;
@@ -3706,6 +3720,7 @@ document.addEventListener("click",ev=>{
   else if(a==="table")askTable();
   else if(a==="logsize"){logBig=!logBig;render()}
   else if(a==="tsheet"){titleSheet=b.dataset.v||null;render()}
+  else if(a==="analytics"){if(anaOpen())location.href=ANA_URL;else{titleSheet="lock";render();setTimeout(()=>{const i=$("#pass");if(i)i.focus()},50)}}
   else if(a==="list"){S.showList=!S.showList;render()}
   else if(a==="camps"){S.showCamps=!S.showCamps;render()}
   else if(a==="dropmode"){S.showList=false;S.managePack=true;render()}
