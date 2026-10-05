@@ -342,7 +342,7 @@ body:has(#app.action){padding-block:8px;min-height:0}
 #app.action .foe-body{gap:3px}
 #app.action .traits{font-size:13px;line-height:1.3}
 #app.action .label.anger{font-size:11px}
-#app.action .q{font-size:18px;line-height:1.35}
+#app.action .q{font-size:17.5px;line-height:1.3}
 #app.action .answers{gap:10px}
 #app.action .ans{padding:9px 12px;font-size:16px;margin:3px 6px}
 #app.action .cats{gap:10px;padding:4px;grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -419,6 +419,43 @@ details.lore summary{font-size:20px;font-weight:400}
 #app.action .tip{margin-bottom:2px}
 .hud.compact .slot{min-height:46px}
 .hud.compact .slot.empty{min-height:40px}
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(5,4,10,.78);display:flex;justify-content:center;align-items:flex-start;padding:16px;overflow-y:auto}
+.sheet{width:100%;max-width:560px;background:var(--slab);background-image:var(--tex);background-size:24px 24px;padding:16px 16px 20px;display:flex;flex-direction:column;gap:12px;margin:6px;
+  --f:#56604f;box-shadow:0 -3px 0 0 var(--f),0 3px 0 0 var(--f),-3px 0 0 0 var(--f),3px 0 0 0 var(--f),0 -6px 0 0 var(--o),0 6px 0 0 var(--o),-6px 0 0 0 var(--o),6px 0 0 0 var(--o),3px 3px 0 0 var(--o),-3px 3px 0 0 var(--o),3px -3px 0 0 var(--o),-3px -3px 0 0 var(--o)}
+.sheethead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheethead h2{font-size:30px}
+.sheethead .btn{margin:6px}
+.rlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rlist li{display:flex;gap:12px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+.rlist li:last-child{border-bottom:0}
+.rlist .ico{width:30px;height:30px}
+.rlist div{display:flex;flex-direction:column;min-width:0}
+.rlist strong{color:var(--gold)}
+.rlist .muted{font-size:15px;line-height:1.3}
+.relics .seeall{margin-left:auto;align-self:center}
+.kithead .linkbtn{margin-left:auto}
+/* tighter action layout so the pack shows in lessons and answers stay in one column */
+#app.action .room{gap:8px}
+.hud.compact{gap:6px}
+.hud.compact .slots{gap:8px}
+.hud.compact .slot:not(.empty){gap:1px;min-height:42px;padding:5px 3px 3px}
+.hud.compact .slot:not(.empty) .ico{width:20px;height:20px}
+.hud.compact .slot:not(.empty) .nm{font-size:13px;line-height:1;white-space:nowrap}
+.hud.compact .slot b{top:1px;right:3px;font-size:12px}
+.hud.compact .slot.empty{min-height:30px;padding:0}
+.hud.compact .slot.empty::before{width:10px;height:10px;background-size:10px 3px,3px 10px}
+#app.action .foe-name{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+#app.action .foe-name .anger{font-family:var(--body);font-size:13px;color:#ff9a8a;white-space:nowrap}
+#app.action .answers{gap:8px}
+#app.action .answers .ans{min-height:40px;padding:7px 12px}
+#app.action .speech{font-size:14px;padding:6px 10px;line-height:1.35}
+#app.action .teacher .tent.small{width:56px}
+#app.action .teacher h2{font-size:22px}
+#app.action .answers{gap:6px}
+#app.action .answers .ans{margin:2px 6px}
+#app.action .timer{height:7px}
+#app.action .room{padding:10px 14px 10px}
+.hud.compact{padding:8px 12px 9px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1684,10 +1721,10 @@ const RELICS=[
 ];
 const rmax=r=>(typeof r==="string"?RELICS.find(x=>x.id===r):r).max||RELIC_MAX;
 const ITEMS=[
- {id:"potion",n:"Healing Draught",d:"Heal 30% of max HP",bt:false},
- {id:"halve",n:"Scroll of Halving",d:"Remove two wrong answers",bt:true},
- {id:"glass",n:"Hourglass",d:"Add 15 seconds to the current question",bt:true},
- {id:"ward",n:"Ward Rune",d:"Block the next hit completely",bt:false}
+ {id:"potion",n:"Healing Draught",sn:"Draught",d:"Heal 30% of max HP",bt:false},
+ {id:"halve",n:"Scroll of Halving",sn:"Scroll",d:"Remove two wrong answers",bt:true},
+ {id:"glass",n:"Hourglass",sn:"Hourglass",d:"Add 15 seconds to the current question",bt:true},
+ {id:"ward",n:"Ward Rune",sn:"Ward Rune",d:"Block the next hit completely",bt:false}
 ];
 
 // ---------- Pixel icons (12×12). Each letter is a palette color, "." is empty.
@@ -2016,6 +2053,20 @@ function recordRun(win,left){
   const runs=loadRuns().filter(r=>r.id!==run.id);runs.unshift(run);
   try{localStorage.setItem(RUNS_KEY,JSON.stringify(runs.slice(0,25)))}catch(e){}
 }
+function listView(){
+  const used={pocket:S.glassUsed||0,pendant:S.pendantUsed||0},acc=S.asked?Math.round(S.correct/S.asked*100):0;
+  const rel=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<li>${ico(r.id)}<div><strong>${esc(r.n)}${k>1?` ×${k}`:""}</strong><span class="muted">${esc(r.d)}${rmax(r)>1?` · ${k} of ${rmax(r)}`:""}${r.id in used?` · used ${used[r.id]} time${used[r.id]===1?"":"s"}`:""}</span></div></li>`}).join("");
+  const bl=S.blessings.map(c=>`<li>${ico("bless")}<div><strong>${esc(TITLES[c]||"Sage")}'s Blessing</strong><span class="muted">×2 knowledge with ${esc(c)}</span></div></li>`).join("");
+  const hist=[...S.floorLog].concat(S.inside&&!["dead","win"].includes(S.screen)?[{f:S.floor,t:"You are here"}]:[]).reverse();
+  return `<div class="overlay" role="dialog" aria-label="Your relics and progress"><div class="sheet">
+    <div class="sheethead"><h2>Your descent</h2><button class="btn ghost" data-a="list">Close</button></div>
+    <div class="stats"><div><span class="label">Floor</span><span class="num">${S.inside?S.floor:"Camp"}</span></div><div><span class="label">Accuracy</span><span class="num">${acc}%</span></div><div><span class="label">Streak</span><span class="num">${S.bestStreak||0}</span></div></div>
+    <p class="label">Relics and blessings</p>
+    ${rel||bl?`<ul class="rlist">${bl}${rel}</ul>`:`<p class="muted">No relics yet. Satisfy a visitor or open a reliquary to earn one.</p>`}
+    <p class="label">Progress, newest first</p>
+    ${hist.length?floorList(hist):`<p class="muted">Nothing yet. Your floors will be listed here as you descend.</p>`}
+  </div></div>`;
+}
 function floorList(log){return `<ol class="floors">${log.map(x=>`<li class="${x.good?"good":x.end?"end":""}"><span class="num">${x.f}</span><span>${esc(x.t)}</span></li>`).join("")}</ol>`}
 // ---------- Saving: campsites (base camp and every campfire) save your descent in this browser
 const SAVE_KEY="conungeon-save";
@@ -2025,7 +2076,7 @@ function saveGame(label){
   const inside=S.inside&&S.screen!=="lesson";
   const where=label||(inside?(S.screen==="rest"?`Healing stone, floor ${S.floor}`:`Floor ${S.floor}${S.phase==="ask"?" · mid-question":""}`):"Base camp");
   const keep=inside?{}:{q:null,lesson:null,enemy:null,offer:null,phase:null,picked:null};
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({...S,...keep,managePack:false,confirmDescend:false,hitMe:false,hitFoe:false,
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({...S,...keep,showList:false,managePack:false,confirmDescend:false,hitMe:false,hitFoe:false,
     screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,6),savedAt:Date.now(),savedWhere:where}))}catch(e){}
 }
 // Saves from before the new question bank may name subjects that no longer exist.
@@ -2059,14 +2110,14 @@ function hud(compact){
   const slots=Array.from({length:shown},(_,i)=>{const sl=P[i];if(!sl)return `<span class="slot empty">Empty</span>`;
     const it=ITEMS.find(x=>x.id===sl.id);
     return manage?`<button class="slot drop" data-a="drop" data-i="${i}" aria-label="Drop ${esc(it.n)}">${ico(sl.id)}<span class="nm">${esc(it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}<span class="x">Drop</span></button>`
-      :`<button class="slot${helps(sl.id)?" help":""}" data-a="item" data-i="${i}" title="${esc(it.d)}">${ico(sl.id)}<span class="nm">${esc(it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
+      :`<button class="slot${helps(sl.id)?" help":""}" data-a="item" data-i="${i}" title="${esc(it.d)}">${ico(sl.id)}<span class="nm">${esc(compact&&it.sn||it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
   const used={pocket:S.glassUsed||0,pendant:S.pendantUsed||0},relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.n)}: ${esc(r.d)}${k>1?` (×${k})`:""}">${ico(r.id,"ico sm")}${compact?"":esc(r.n)}${k>1?` <b>×${k}</b>`:""}${r.id in used?` <b>· ${used[r.id]}${compact?"":" used"}</b>`:""}</span>`}).join("");
   if(compact){const camp=S.screen==="lesson";
     return `<div class="hud compact${S.hitMe?" shake":""}">
       <div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar"><i style="width:${S.hp/S.maxHp*100}%"></i></div><span class="num">${S.hp}/${S.maxHp}</span><span class="label cfl">${camp?`${ico("gold","ico sm")}${S.gold}`:`Floor <b>${S.floor}</b>`}</span></div>
       ${danger?`<div class="danger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Glowing items can help.":""}</div>`:""}
-      ${camp?"":`<div class="slots">${slots}</div>`}
-      ${!camp&&(relics||S.blessings.length)?`<div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}${esc(c)}</span>`).join("")}${relics}</div>`:""}
+      <div class="slots">${slots}</div>
+      <div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}${esc(c)}</span>`).join("")}${relics}<button class="linkbtn seeall" data-a="list">See all</button></div>
     </div>`}
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label withico">${ico("heart","ico sm")}Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
@@ -2077,7 +2128,7 @@ function hud(compact){
       <div class="kithead"><span class="label">Pack</span><span class="kitright"><span class="label ${full?"full":""}">${P.length} / ${MAX_ITEMS}${full?" · full":""}</span>${P.length?`<button class="linkbtn" data-a="manage">${manage?"Done":"Drop items"}</button>`:""}</span></div>
       ${danger?`<div class="danger">${lethal?"Danger! The next hit could knock you out.":"Danger! Your health is low."}${P.some(sl=>helps(sl.id))?" Glowing items can help.":""}</div>`:""}
       <div class="slots">${slots}</div>
-      ${relics||S.blessings.length||S.won?`${compact?"":`<div class="kithead"><span class="label">Relics · passive</span></div>`}<div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}${compact?esc(c):`${esc(TITLES[c]||"Sage")}'s Blessing`}</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">${ico("trivial","ico sm")}Trivial Relic</span>`:""}</div>`:""}
+      ${relics||S.blessings.length||S.won?`${compact?"":`<div class="kithead"><span class="label">Relics · passive</span><button class="linkbtn" data-a="list">See all</button></div>`}<div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}${compact?esc(c):`${esc(TITLES[c]||"Sage")}'s Blessing`}</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">${ico("trivial","ico sm")}Trivial Relic</span>`:""}</div>`:""}
     </div>
   </div>`;
 }
@@ -2122,7 +2173,7 @@ function render(){
     }else{
       main=`<div class="meta"><span class="label">${esc(q.cat)} · ${{e:"easy",m:"medium",h:"hard"}[q.d]} · ${GOLD_FOR[q.d]} gold</span><span class="dots">${dots}</span></div>
         <p class="q">${esc(q.text)}</p>
-        <div class="answers${done?" done":""}${q.opts.every(o=>o.length<=16)?" two":""}">${q.opts.map((o,i)=>{let c="";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
+        <div class="answers${done?" done":""}">${q.opts.map((o,i)=>{let c="";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
           return `<button class="ans ${c}" data-a="ans" data-i="${i}" ${done?"disabled":""}><span class="k">${i+1}</span><span>${esc(o)}</span></button>`}).join("")}</div>
         ${done?`<p class="${S.picked===q.right?"good":"bad"}">${S.picked===q.right?`Correct. +${GOLD_FOR[q.d]} gold.`:`Not quite. The answer is ${esc(q.right)}.`}</p><div class="nextrow"><button class="btn" data-a="lnext" id="nextbtn">${L.k<LESSON.length-1?"Next question":"Finish the lesson"}</button></div>${tipBox(q)}`:""}`;
     }
@@ -2144,7 +2195,7 @@ function render(){
       <div class="meta"><span class="label">${esc(q.cat)} · hard · ${S.hz==="boulder"?`−${Math.ceil(S.maxHp*H.ok)} HP if right, −${Math.ceil(S.maxHp*H.bad)} if wrong`:`−${Math.ceil(S.maxHp*H.bad)} HP if wrong`}</span><span class="label num" id="tnum">${done?"":Math.ceil(S.tLeft)+"s"}</span></div>
       ${done?"":`<div class="timer"><i id="tbar" style="width:${S.tLeft/S.tMax*100}%"></i></div>`}
       <p class="q">${esc(q.text)}</p>
-      <div class="answers${done?" done":""}${q.opts.every(o=>o.length<=16)?" two":""}">${q.opts.map((o,i)=>{let c="";if(q.removed.includes(o))c="gone";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
+      <div class="answers${done?" done":""}">${q.opts.map((o,i)=>{let c="";if(q.removed.includes(o))c="gone";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
         return `<button class="ans ${c}" data-a="ans" data-i="${i}" ${done||q.removed.includes(o)?"disabled":""}><span class="k">${i+1}</span><span>${esc(o)}</span></button>`}).join("")}</div>
       ${done?`${alog(1)}<div class="nextrow"><button class="btn" data-a="hznext" id="nextbtn">${S.hp<=0?"Fall":"Press on"}</button></div>${tipBox(q)}`:""}</section>`;
   }else if(S.screen==="reward"){
@@ -2163,15 +2214,15 @@ function render(){
       mid=`<div class="meta"><span class="label">${q.cat} · ${{e:"easy",m:"medium",h:"hard"}[q.d]} · <span class="${q.cat===e.weak?"good":q.cat===e.resist?"bad":""}">×${mm}${mtag?" "+mtag:""}</span></span>${!done&&has("table")&&!q.lean&&(e.tableUsed||0)<cnt("table")?`<button class="linkbtn" data-a="table">Ask table (${cnt("table")-(e.tableUsed||0)})</button>`:""}<span class="label num" id="tnum">${done?"":Math.ceil(S.tLeft)+"s"}</span></div>
         ${done?"":`<div class="timer"><i id="tbar" style="width:${S.tLeft/S.tMax*100}%"></i></div>`}
         <p class="q">${esc(q.text)}</p>
-        <div class="answers${done?" done":""}${q.opts.every(o=>o.length<=16)?" two":""}">${q.opts.map((o,i)=>{let c="";if(q.removed.includes(o))c="gone";else if(!done&&q.lean===o)c="lean";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
+        <div class="answers${done?" done":""}">${q.opts.map((o,i)=>{let c="";if(q.removed.includes(o))c="gone";else if(!done&&q.lean===o)c="lean";if(done){if(o===q.right)c="right";else if(o===S.picked)c="wrong"}
           return `<button class="ans ${c}" data-a="ans" data-i="${i}" ${done||q.removed.includes(o)?"disabled":""}><span class="k">${i+1}</span><span>${esc(o)}</span></button>`}).join("")}</div>
         ${done?`${alog(1)}<div class="nextrow"><button class="btn" data-a="next" id="nextbtn">${S.hp<=0?"Fall":e.hp<=0?"Claim victory":"Continue"}</button></div>${tipBox(q)}`:""}`;
     }
     body=`<section class="room">
       <div class="foe${S.hitFoe?" shake":""}"><div class="sigil ${e.boss?"boss":""}" aria-hidden="true">${e.g}</div>
-        <div class="foe-body"><div class="foe-name">${esc(e.n)}</div>
+        <div class="foe-body"><div class="foe-name">${esc(e.n)}<span class="anger">−${hitFor(e)} HP if wrong</span></div>
           <div class="kline"><span class="label">Knowledge</span><div class="bar know"><i style="width:${(e.max-e.hp)/e.max*100}%"></i></div><span class="num">${e.max-e.hp}/${e.max}</span></div>
-          <div class="traits"><span class="weak">Craves ${e.weak}</span><span class="resist">Bored by ${e.resist}</span><span class="anger">−${hitFor(e)} HP if wrong</span></div></div></div>
+          <div class="traits"><span class="weak">Craves ${e.weak}</span><span class="resist">Bored by ${e.resist}</span></div></div></div>
       ${mid}</section>`;
   }else{
     const win=S.screen==="win", acc=S.asked?Math.round(S.correct/S.asked*100):0;
@@ -2187,7 +2238,7 @@ function render(){
       ${S.missed.length?`<section class="room"><div><p class="label">Study these</p><h2>What you missed</h2></div><div class="review">${S.missed.slice(-15).reverse().map(m=>`<div><p>${esc(m.q)}</p><p class="good">${esc(m.a)}</p></div>`).join("")}</div></section>`:""}`;
   }
   const action=["battle","lesson","hazard"].includes(S.screen);app.className=action?"action":"";
-  app.innerHTML=action?hud(true)+body:`<header><p class="label">Conungeon</p></header>`+hud()+body+logView();
+  app.innerHTML=(S.showList?listView():"")+(action?hud(true)+body:`<header><p class="label">Conungeon</p></header>`+hud()+body+logView());
   const key=S.screen+"|"+S.phase;if(action&&key!==lastView&&window.scrollTo)scrollTo(0,0);lastView=key;
   drawDoors(performance.now());drawTents(performance.now());drawCampScene(performance.now());drawRelics(performance.now());
   S.hitFoe=S.hitMe=false;
@@ -2545,6 +2596,7 @@ document.addEventListener("click",ev=>{
   if(a==="start")newRun();
   else if(a==="continue")resumeGame();
   else if(a==="table")askTable();
+  else if(a==="list"){S.showList=!S.showList;render()}
   else if(a==="rels"){S.showRels=!S.showRels;render()}
   else if(a==="story"){storyOpen=!storyOpen;render()}
   else if(a==="newgame"){confirmNew=true;render()}
