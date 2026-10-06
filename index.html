@@ -104,7 +104,7 @@ button.chip.item:hover{background:var(--slab-2)}
 .btn:disabled{opacity:.45;cursor:default}
 .door small{line-height:1.3}
 .door{background:var(--stone);border:1px solid var(--line);border-radius:4px;padding:8px 8px 14px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center;transition:border-color .15s,transform .15s}
-.door:hover{border-color:var(--torch);transform:translateY(-2px)}
+.door:hover{border-color:var(--torch)}
 .cave{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:64/44;image-rendering:pixelated;image-rendering:crisp-edges;border:3px solid #05040a;margin-bottom:4px}
 .door:hover .cave{border-color:var(--torch)}
 .door.elite .glyph{color:var(--blood)} .door.rest .glyph{color:var(--mana)} .door.treasure .glyph{color:var(--gold)}
@@ -252,7 +252,7 @@ button.slot:active{transform:translateY(2px)}
 /* Doors and cards */
 .doors{gap:16px;padding:6px}
 .door{background:#141815;--f:#4b554d;margin:0}
-.door:hover:not(:disabled){--f:var(--torch);transform:translateY(-3px)}
+.door:hover:not(:disabled){--f:var(--torch)}
 .door strong{font-family:var(--mono);font-weight:600;font-size:17px}
 .door.elite{--f:#7a3a30} .door.rest{--f:#2e6d66} .door.treasure{--f:#6a5a33} .door.boss{--f:#7a4fb8}
 .cave,.tent{border-width:3px}
@@ -721,6 +721,7 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 .lockform input{flex:1;min-width:0;font:inherit;font-family:var(--mono);font-size:24px;letter-spacing:.3em;padding:8px 12px;background:#0c0d0c;color:var(--parch);border:0;margin:6px;
   box-shadow:0 -3px 0 0 #56604f,0 3px 0 0 #56604f,-3px 0 0 0 #56604f,3px 0 0 0 #56604f}
 .lockform input:focus{outline:none;box-shadow:0 -3px 0 0 var(--torch),0 3px 0 0 var(--torch),-3px 0 0 0 var(--torch),3px 0 0 0 var(--torch)}
+.door{transition:none}
 </style>
 </head>
 <body>
@@ -823,7 +824,7 @@ const ICON={};
 try{if(typeof document!=="undefined"&&document.createElement){for(const [id,rows] of Object.entries(SPRITES)){const cv=document.createElement("canvas");cv.width=cv.height=12;const g=cv.getContext&&cv.getContext("2d");if(!g)continue;
   rows.forEach((row,y)=>[...row].forEach((ch,x)=>{if(PAL[ch]){g.fillStyle=PAL[ch];g.fillRect(x,y,1,1)}}));ICON[id]=cv.toDataURL()}}}catch(e){}
 const ico=(id,cls="ico")=>ICON[id]?`<img class="${cls}" src="${ICON[id]}" alt="" aria-hidden="true">`:"";
-const HP_SHARE=.03, HP_FADE=120, ANGER=1, RAMP=4; // max HP gained per visitor = this share of their thirst (knowledge bar)
+const HP_SHARE=.03, HP_FADE=120, ANGER=1, RAMP=8; // after floor 10, hits grow by +1/8 of their base each floor (was 1/4, a cliff by floor 17) // max HP gained per visitor = this share of their thirst (knowledge bar)
 const BASE_TIME=20, MAX_ITEMS=4, STACK=10, RELIC_MAX=10;
 // The pack holds 4 slots (one per item type). Copies of the same item stack in one slot, up to 10.
 const packItems=()=>{const m=[];(S.items||[]).map(x=>typeof x==="string"?{id:x,n:1}:x).filter(x=>ITEMS.some(i=>i.id===x.id)).forEach(x=>{const h=m.find(y=>y.id===x.id);if(h)h.n=Math.min(99,h.n+x.n);else m.push({id:x.id,n:x.n})});return S.items=m};
@@ -920,7 +921,7 @@ function descend(){
   saveGame("Floor 1");render();
 }
 function newRun(){
-  S={screen:"camp",floor:1,gold:0,bought:{},blessings:[],camp:null,hp:30,maxHp:30,power:6,relics:[],items:[{id:"potion",n:1}],used:{},ward:false,
+  S={screen:"camp",floor:1,gold:0,bought:{},blessings:[],camp:null,hp:30,maxHp:30,power:6,powV2:1,relics:[],items:[{id:"potion",n:1}],used:{},ward:false,
      correct:0,asked:0,streak:0,bestStreak:0,missed:[],endless:false,floorLog:[],floorEvent:"",runId:Date.now(),log:["Curious minds have set up camp around the portal. Scholars wave you over."],best:loadBest()};
   S.camp=makeCamp();render();
 }
@@ -938,9 +939,11 @@ function makeDoors(){
 // ---------- Questions
 function diffFor(){
   const f=S.floor, e=S.enemy;
-  let i=f<=4?0:f<=9?1:2;
-  if(e&&(e.elite||e.boss))i=Math.min(2,i+1);
-  if(Math.random()<.25)i=Math.max(0,i-1);
+  // Bosses test you with hard questions instead of a giant knowledge bar.
+  if(e&&e.boss)return "h";
+  let i=f<=4?0:f<=19?1:Math.random()<.5?1:2;   // easy early, then medium, then a medium/hard mix
+  if(e&&e.elite)i=Math.min(2,i+1);              // rowdy tables ask one level harder
+  if(Math.random()<.2)i=Math.max(0,i-1);
   return "emh"[i];
 }
 // Questions you've already seen are remembered across runs (in this browser), so a new run
@@ -993,17 +996,18 @@ function startFight(t){
   const tier=tierFor(f), mix=tier===3&&Math.random()<.4?TIERS[2]:TIERS[tier];
   const [n,g,hit]=boss?bossFor(f):pick(mix);
   // Monsters keep getting tougher the deeper you go, so every run has a natural limit.
-  let hp=10+f*6+Math.floor(f*f/4), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/35);
+  // Knowledge bars grow about as fast as Power (+1 per floor): a plain right answer chips off roughly 1/8 at any depth
+  let hp=25+f*8+Math.floor(f*f/30), atk=2+Math.ceil(f*1.1)+Math.floor(f*f/35);
   atk=Math.round(atk*ANGER*(1+Math.max(0,Math.min(f,GOAL)-10)/RAMP)); // visitors get angrier the deeper you go
   if(f>GOAL){const k=1+(f-GOAL)*.03;hp=Math.round(hp*k);atk=Math.round(atk*k)}
-  if(elite){hp=Math.round(hp*1.5);atk+=2}
-  if(boss){hp=Math.round(hp*(1.35+Math.min(.85,Math.max(0,(f-10)*.05))));atk+=3}
+  if(elite){hp=Math.round(hp*1.3);atk+=2}
+  if(boss){hp=Math.round(hp*1.15);atk+=3}
   const cats=shuffle(available());
   S.enemy={n:(elite?"Rowdy ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0,optional};
   S.screen="battle";S.phase="choose";S.offer=shuffle(available()).slice(0,3);
   if(!S.offer.includes(S.enemy.weak)&&Math.random()<.5)S.offer[0]=S.enemy.weak;
   S.offer=shuffle(S.offer);
-  S.log.unshift(S.enemy.boss?`${S.enemy.n}, guardian of the floor, slams the table. "Answer me!"`:`${S.enemy.n} waves you over to their table.`);render();
+  S.log.unshift(S.enemy.boss?`${S.enemy.n}, guardian of the floor, slams the table. "Answer me!" Only hard questions at this table.`:`${S.enemy.n} waves you over to their table.`);render();
 }
 const QUIPS=["Do you even live on the surface?!","Come ON. That's your own planet!","We traveled four dimensions for this.","Ugh. You're harshing our vibe.","Even Gerald knew that one, and Gerald eats rocks.","That's going on the scoreboard. In red.","Did you just guess? You just guessed.","My larva could answer that.","Trivia night is SACRED.","Who let the Earthling sit at our table?","We studied YOUR planet for this!","I waited all cycle for this night.","Bold choice. Wrong, but bold.","Somebody fetch this human a book.","Oh no. Oh no no no.","And you call yourselves the dominant species?","We paid a cover charge for this.","Please tell me that was a joke.","All of my tentacles are facepalming.","I'm telling the Quizmaster about this."];
 const GIFT_CHANCE=.1, GIFT_POOL=["potion","potion","glass","halve","ward"];
@@ -1084,10 +1088,10 @@ function nextTurn(){
   if(S.hp<=0){endRun(false);return}
   if(e.hp<=0){
     // Growing tougher: monsters hit harder each floor, so each win raises your max HP too.
-    const gain=Math.max(2,Math.round(e.max*HP_SHARE*Math.max(.25,1-Math.min(S.floor,GOAL)/HP_FADE)*(e.boss?2:e.elite?1.5:1)));S.maxHp+=gain;S.hp=e.boss?S.maxHp:Math.min(S.maxHp,S.hp+gain);S.power++;
+    const gain=Math.max(2,Math.round(e.max*HP_SHARE*Math.max(.25,1-Math.min(S.floor,GOAL)/HP_FADE)*(e.boss?2:e.elite?1.5:1)));S.maxHp+=gain;S.hp=e.boss?S.maxHp:Math.min(S.maxHp,S.hp+gain);
     if(depths()&&!e.boss){const h=Math.ceil(S.maxHp*.15);S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`In the Depths, every victory steadies you. +${h} HP.`)}
     if(has("drinks")&&!e.boss){const h=Math.ceil(S.maxHp*.1*cnt("drinks"));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You buy the table a round of drinks. +${h} HP.`)}
-    S.log.unshift(`${esc(e.n)}'s thirst for knowledge is quenched. +1 power, +${gain} max HP${e.boss?", and you're fully healed":""}.`);
+    S.log.unshift(`${esc(e.n)}'s thirst for knowledge is quenched. +${gain} max HP${e.boss?", and you're fully healed":""}.`);
     if(e.boss&&S.floor===GOAL&&!S.won){S.won=true;S.floorEvent="Defeated The Super Computaur (boss) · won the Trivial Relic";try{localStorage.setItem("conungeon-trophy",new Date().toISOString().slice(0,10))}catch(x){}endRun(true);return}
     S.floorEvent=`Satisfied ${e.n.replace(/^Rowdy /,"")}${e.boss?" (boss)":e.elite?" (rowdy)":""}`;
     if(e.boss){S.since=0;S.bossCount=(S.bossCount||0)+1;
@@ -1113,7 +1117,7 @@ function takeReward(i){
   advance();
 }
 // ---------- Run log: one line per floor cleared, plus saved history of past runs
-function advance(){S.since=(S.since||0)+1;S.floorLog.push({f:S.floor,t:[S.hzNote,S.floorEvent].filter(Boolean).join(" · ")||"Passed through"});S.hzNote="";S.floorEvent="";S.floor++;S.doors=makeDoors();S.screen="map";render()}
+function advance(){S.since=(S.since||0)+1;S.floorLog.push({f:S.floor,t:[S.hzNote,S.floorEvent].filter(Boolean).join(" · ")||"Passed through"});S.hzNote="";S.floorEvent="";S.floor++;S.power++;S.doors=makeDoors();S.screen="map";render()}
 function useItem(i){
   const slot=packItems()[i];if(!slot)return;const id=slot.id;
   if(id==="potion"){if(S.hp>=S.maxHp)return;const h=Math.max(12,Math.round(S.maxHp*.3));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You drink a Healing Draught. +${h} HP.`)}
@@ -1207,7 +1211,9 @@ function saveGame(label){
     screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,40),savedAt:Date.now(),savedWhere:where}))}catch(e){}
 }
 // Saves from before the new question bank may name subjects that no longer exist.
-function fixSubjects(){const ren=c=>c==="Sports"?"Sports & Games":c,ok=c=>CATS.includes(c);
+// Older saves earned Power only from visitors; catch them up to the depth-based rule (+1 per floor)
+function fixPower(){if(!S||S.powV2)return;S.powV2=1;if(S.inside)S.power=Math.max(S.power||6,6+(S.floor-1)+(S.bought&&S.bought.insight?2:0))}
+function fixSubjects(){fixPower();const ren=c=>c==="Sports"?"Sports & Games":c,ok=c=>CATS.includes(c);
   if(S.camp&&S.camp.tents)S.camp.tents.forEach(t=>{t.cat=ren(t.cat)});S.blessings=(S.blessings||[]).map(ren);if(S.enemy){S.enemy.weak=ren(S.enemy.weak);S.enemy.resist=ren(S.enemy.resist)}if(S.offer)S.offer=S.offer.map(ren);if(S.q)S.q.cat=ren(S.q.cat);
   if(S.camp&&S.camp.tents&&!S.camp.tents.every(t=>ok(t.cat))){const old=S.camp.tents;S.camp=makeCamp();}
   S.blessings=(S.blessings||[]).filter(ok);
@@ -1688,7 +1694,7 @@ function buryDoor(cv){
 }
 function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>{drawCave(cv,t);if(cv.dataset.buried)buryDoor(cv)})}
 const STORY_P=["One morning, strange portals tore open in the ground all over the world. Each one led down a deep, dark staircase, with a low rumble and hungry eyes glaring up from below.", "It took months for the world to agree on a plan, a new world record for agreeing on anything. Finally, a brave soul from every country stepped inside.", "They found monsters of every shape and size, all with an endless, terrible thirst for… knowledge?", "It turns out the portals lead to an interdimensional trivia bar. Twisting passages wind from den to den, where visitors from across the multiverse gather for trivia night. This season, for the very first time, the theme is Earth. Can you guess the bar's name? That's right: <b>the Conungeon</b>, the Dungeon of Conundrums.", "Why do they look so menacing? No idea. They don't judge your face, so don't judge theirs.", "They <i>do</i> judge your answers, though. Life is busy across a dozen dimensions, and trivia night is the one night they get with their friends. So when an actual Earthling sits down and doesn't know things about their own planet, it kind of harshes the vibe. <i>\"Oh, come ON. Do you even live on the surface?!\"</i>", "Answer well and they'll share gifts from beyond. Anger them too much and they'll knock you out cold and send you back up to the surface. On floor 100, the bar's Quizmaster, the Super Computaur, hosts the final round.", "Now curious minds from all over the world gather at the portal's mouth, trading notes and working up their courage. How deep will you dare to go?"];
-const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Pick a subject each turn. Right answers fill the bar, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. Lose all your health and they knock you out and send you back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Every passage takes you one floor deeper. Healing stones restore health, but you skip that floor's visitor and gifts.</li>\n        <li><b>Relics and items.</b> Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
+const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Pick a subject each turn. Each right answer fills the bar by your Power, which grows by 1 every floor you descend, whichever passage you take, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. Lose all your health and they knock you out and send you back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Every passage takes you one floor deeper. Healing stones restore health, but you skip that floor's visitor and gifts.</li>\n        <li><b>Relics and items.</b> Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
 let titleSheet=null;
 // Analytics Conungeon: a passcode-gated link (remembered on this device once entered)
 const ANA_URL="analytics.html",ANA_CODE="1234";
