@@ -650,6 +650,7 @@ footer.info.big{height:58dvh}
 #app.run .sgrid{flex:1 1 auto;grid-auto-rows:1fr;align-items:stretch;max-height:520px}
 #app.run .wgrid{flex:1 1 auto;grid-auto-rows:1fr}
 #app.run .rewards{flex:1 1 auto;grid-auto-rows:1fr;max-height:420px}
+#app.run .rewards.one{flex:none;grid-auto-rows:auto;min-height:120px}
 #app.run .hubgrid{flex:none}
 #app.run .campscene{flex:1 1 0;min-height:80px;max-height:56vw;width:auto;height:auto;max-width:100%;align-self:center}
 #app.titlemode .scene{flex:1 1 0;min-height:90px;max-height:56vw;width:auto;height:auto;max-width:100%;align-self:center}
@@ -757,6 +758,21 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 @keyframes wardglow{50%{box-shadow:0 0 0 2px #c8fbff,0 0 18px 6px rgba(110,220,255,.95)}}
 @keyframes wardsheen{from{background-position:150% 0}to{background-position:-100% 0}}
 @media (prefers-reduced-motion: reduce){.bar.warded,.bar.warded::after{animation:none}}
+
+/* Drop mode: red frame, striped slots and a banner, so it never looks like the normal pack */
+.hud.dropping{--f:var(--blood);background:linear-gradient(#2a1412,#1a0e0c)}
+.slot.drop{background:repeating-linear-gradient(135deg,#2a1210 0 6px,#1c0d0b 6px 12px);color:#ffd0c8;--f:#cf3b3b;animation:dropwob 1.2s steps(2) infinite}
+.slot.drop .x{position:absolute;top:3px;left:5px;font-size:9px;color:#ff8170;letter-spacing:.1em;line-height:1}
+.slot.drop.sel{--f:#ff8170;box-shadow:0 0 0 2px #ff8170,0 0 12px 2px rgba(255,110,90,.6);animation:none}
+.slot.drop.dim{opacity:.4;animation:none}
+@keyframes dropwob{50%{transform:translateY(-1px)}}
+.dropbar{display:flex;align-items:center;justify-content:space-between;gap:8px;height:32px;box-sizing:border-box;padding:0 2px;font-family:var(--mono);font-size:13px;color:#ff9a8a}
+.dropbar .dtx{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dropbar.ask .dtx{color:var(--parch);font-size:14px}
+.dropbar .dbtns{display:flex;gap:6px;flex:none}
+.dbtn{font:inherit;font-family:var(--mono);font-size:13px;line-height:1;padding:5px 10px;border:2px solid #6a5a33;background:#141815;color:var(--parch);cursor:pointer}
+.dbtn.red{border-color:#cf3b3b;background:#4a1714;color:#ffd0c8}
+@media (prefers-reduced-motion: reduce){.slot.drop{animation:none}}
 
 /* ---------- Analytics Conungeon additions */
 :root{--ink:#ebe1c8;--ink-2:#a39c88;--card:#141815;--pen:#e3a548;--muted-bg:#1d1a12;--line:#3d463f;--serif:"Alegreya Sans",Georgia,serif;--sans:"Alegreya Sans",system-ui,sans-serif;--ok:#6cbcae;--bad:#cf5444;--warn:#e3a548;--hl:#3a3216;--hl-ink:#ffe08a;--paper:#141815;--grid:#2d342f;--ok-bg:#13231f;--bad-bg:#2a1210;--warn-bg:#2a2210}
@@ -1118,17 +1134,20 @@ function finishVisit(){
   // Like the Trivia Conungeon: after a visit, a healing stone and a reliquary sometimes open up as side rooms.
   // Pick one; the pair won't return until you've finished another visit.
   S.side=Math.random()<SIDE_CHANCE;
+  {const pool=[shuffle(LOOT.filter(l=>!l.item&&cnt(l.id)<l.max))[0],pick(LOOT.filter(l=>l.item))].filter(Boolean);V.loot=pool.length?pick(pool).id:null;V.took=false}
   save();render(true);
 }
 function openSide(t){if(!S.side)return;
   if(t==="rest"){S.side=false;const h=heal(Math.ceil(S.maxHp*STONE_HEAL));say(`The healing stone hums. You recover ${h} HP.`);save();render(true);return}
   const relics=shuffle(LOOT.filter(l=>!l.item&&cnt(l.id)<l.max)).slice(0,2),items=shuffle(LOOT.filter(l=>l.item&&itemOK(l))).slice(0,1);
   S.reliq=relics.concat(items).slice(0,3).map(l=>l.id);S.screen="reliq";render(true)}
-function takeLoot(id){if(S.screen!=="reliq")return;const l=LOOT.find(x=>x.id===id);S.side=false;S.reliq=null;S.screen="map";
+function takeLoot(id){if(S.screen!=="reliq")return;S.side=false;S.reliq=null;S.screen="map";grant(id);save();render(true)}
+// A visitor's parting gift: one random relic or item, by luck (an item can arrive when your pack is already full)
+function takeDrop(){const V=S.visit;if(S.screen!=="clear"||!V||!V.loot||V.took)return;const l=LOOT.find(x=>x.id===V.loot);if(l.item&&!itemOK(l))return;V.took=true;grant(l.id);save();render(true)}
+function grant(id){const l=LOOT.find(x=>x.id===id);
   if(l.id==="ward"){S.wards=Math.min(WARD_MAX,(S.wards||0)+1);say(`${ico("ward","ico sm")} You take a Ward Rune. It hums around you, ready to block the next blow (${S.wards} held).`)}
   else if(l.item){S.potions=Math.min(POTION_MAX,S.potions+2);say(`${ico("potion","ico sm")} You take two potions (${S.potions} in your pack).`)}
-  else{S.relics.push(id);if(id==="tome"){const g=pct(cnt("tome")<=5?.15:.05);S.maxHp+=g;heal(g)}say(`${ico(id,"ico sm")} You take the ${l.n}${cnt(id)>1?` (×${cnt(id)})`:""}. ${l.d}`)}
-  save();render(true)}
+  else{S.relics.push(id);if(id==="tome"){const g=pct(cnt("tome")<=5?.15:.05);S.maxHp+=g;heal(g)}say(`${ico(id,"ico sm")} You take the ${l.n}${cnt(id)>1?` (×${cnt(id)})`:""}. ${l.d}`)}}
 function revive(){S.revives++;S.hp=S.maxHp;S.screen="battle";S.visit.pendant=true;say(`You come to on the floor. A kind bartender helps you up: revive #${S.revives}, full health. The visitor is still waiting.`);nextQ()}
 
 // ---------- views
@@ -1187,6 +1206,8 @@ function clearView(){
   const V=S.visit,[n,g]=VIS[V.k],c=mCount(V.k),t=SECQ[V.k].length;
   return `<section class="room page"><div class="foe one"><div class="sigil" aria-hidden="true">${g}</div><div class="foe-name">${esc(n)}</div><span class="num">${V.right}/${V.queue.length}</span></div>
     <p class="muted small">${V.endless?`Endless visitors cleared: ${S.endless.visits}.`:secDone(V.k)?"Round mastered!":`${c} of ${t} questions in this round mastered, ${scnLeft(V.k)} scenario${scnLeft(V.k)===1?"":"s"} to go.`}${V.grow?` +${V.grow} max HP.`:""}</p>
+    ${V.loot?(()=>{const l=LOOT.find(x=>x.id===V.loot),full=l.item&&!itemOK(l)&&!V.took,k=l.item?itemCount(l.id):cnt(l.id);
+      return `<p class="label">${V.took?"You took":`${esc(n)} left something behind`}</p><div class="rewards one"><button class="reward${l.item?" it":""}${V.took?" took":""}" data-a="drop" ${V.took||full?"disabled":""}>${ico(l.id)}<span class="rtx"><strong>${esc(l.n)}</strong><span class="label">${V.took?"Taken":full?"Item · pack full":l.item?`Item · ${k} in pack`:l.max===Infinity?(k?`Relic · ${k} owned, no limit`:"Relic · no limit"):k?`Relic · ${k} of ${l.max}`:`Relic · stacks to ${l.max}`}</span><span class="muted">${esc(l.d)}</span></span></button></div>`})():""}
     ${S.side?`<p class="muted small">A healing stone and a reliquary have opened up beside the passages. You'll find them on the way back.</p>`:""}
     ${V.missed.length?`<p class="label">${V.endless?"Missed this visit":"They'll ask these again"}</p><div class="review">${V.missed.map(id=>{const q=QBY[id];return `<div><p>${q.q}</p><p class="good">${q.ok.map(i=>esc(q.opts[i][0])).join("; ")}</p></div>`}).join("")}</div>`:""}
   </section>`;
@@ -1245,7 +1266,8 @@ function footer(){
   else if(S.screen==="battle"){const q=curQ(),V=S.visit;
     if(asking)nav=(q.multi?`<button class="btn right" data-a="submit" ${S.sel.length?"":"disabled"}>Submit</button>`:`<button class="btn right" disabled>Next question</button>`);
     else nav=`<button class="btn right" data-a="next" id="nextbtn">${S.hp<=0?"Fall":V.i+1>=V.queue.length?"Finish visit":"Next question"}</button>`}
-  else if(S.screen==="clear")nav=`<button class="btn right" data-a="map">Next visitors</button>`;
+  else if(S.screen==="clear"){const V=S.visit,l=V&&V.loot&&!V.took&&LOOT.find(x=>x.id===V.loot);
+    nav=l&&!(l.item&&!itemOK(l))?`<button class="btn" data-a="drop" id="nextbtn">Take it</button><button class="btn ghost right" data-a="map">Leave it</button>`:`<button class="btn right" data-a="map">Next visitors</button>`}
   else if(S.screen==="reliq")nav=`<button class="btn ghost" data-a="leavereliq">Not now</button>`;
   else if(S.screen==="final")nav=`<button class="btn right" data-a="title">Title page</button>`;
   else if(S.screen==="faint")nav=`<button class="btn ghost" data-a="map">‹ Leave</button><button class="btn right" data-a="revive" id="nextbtn">Revive</button>`;
@@ -1269,6 +1291,7 @@ document.addEventListener("click",ev=>{
   else if(a==="next")nextQ();
   else if(a==="visit")startVisit(b.dataset.v);
   else if(a==="loot")takeLoot(b.dataset.v);
+  else if(a==="drop")takeDrop();
   else if(a==="side")openSide(b.dataset.v);
   else if(a==="leavereliq"){S.screen="map";S.reliq=null;render(true)}
   else if(a==="map"||a==="leave"){stopTimer();if(a==="leave"&&S.screen==="battle"){say(`You step away from ${VIS[S.visit.k][0]}. Your mastered answers are saved.`)}S.screen="map";S.visit=null;save();render(true)}
