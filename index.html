@@ -624,7 +624,17 @@ footer.info .navbox .btn{margin:6px 4px}
 footer.info .navbox{width:100%}#app footer.info .navbox .btn.right{margin-left:auto}
 .btn:disabled{opacity:.4;filter:grayscale(.6)}
 footer.info .infotext{position:relative;padding-top:6px}
-footer.info .grow{float:right;margin:0 0 4px 10px;font-size:14px;border-bottom:0;color:var(--dim)}
+footer.info .grow{position:absolute;top:4px;right:6px;margin:0;padding:2px 4px;font-size:13px;line-height:1.2;border-bottom:0;color:var(--dim);z-index:1}
+footer.info .infotext{padding-top:22px!important}
+.pcount{display:inline-flex;align-items:center;gap:5px;background:none;border:0;padding:0 2px;font:inherit;font-family:var(--mono);font-size:14px;color:var(--dim);cursor:pointer;white-space:nowrap}
+.pcount b{color:var(--parch);font-weight:400}
+.pcount .ico.sm{width:14px;height:14px}
+table.boosts{width:100%;border-collapse:collapse;font-size:14px;margin:2px 0 6px}
+table.boosts th{text-align:left;font-weight:400;padding:6px 6px 6px 0;color:var(--parch)}
+table.boosts td{padding:6px 4px;vertical-align:top}
+table.boosts td:nth-child(2){color:var(--torch);white-space:nowrap}
+table.boosts td.muted{font-size:12px}
+table.boosts tr+tr{border-top:1px solid var(--line)}
 footer.info .alog p{margin:0 0 5px;line-height:1.35}
 .tipline{display:block;margin:2px 0 4px;padding:5px 8px;background:#1d1a12;color:var(--parch);border-left:3px solid #8a6a2a;
   box-shadow:0 -2px 0 0 #6a5a33,0 2px 0 0 #6a5a33,-2px 0 0 0 #6a5a33,2px 0 0 0 #6a5a33}
@@ -1221,6 +1231,29 @@ function campsView(){
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-a="menu">Title screen</button></div>
   </div></div>`;
 }
+// Passive skills: every relic (stacks counted), every mentor, and the Trivial Relic
+const passiveCount=()=>RELICS.reduce((a,r)=>a+cnt(r.id),0)+(S.blessings?S.blessings.length:0)+(S.won?1:0);
+// "How it adds up": the live numbers behind every multiplier, so stacking relics is easy to read
+function boostRows(){
+  const pc=n=>`${Math.round(n*100)}%`,x=n=>`×${+n.toFixed(2)}`,rows=[];
+  const add=(k,v,src)=>rows.push(`<tr><th>${k}</th><td>${v}</td><td class="muted">${src}</td></tr>`);
+  const base=1+.05*cnt("quill")+(S.bought&&S.bought.insight?.1:0);
+  add("Knowledge per right answer",`${+(S.power*base).toFixed(1)}`,`Pow ${S.power}${base>1?` ${x(base)}`:""}${cnt("quill")?` · Quill +${5*cnt("quill")}%`:""}${S.bought&&S.bought.insight?" · Insight +10%":""}`);
+  add("Craved subject",x(2+.5*cnt("lens")),cnt("lens")?`Lens +${.5*cnt("lens")}`:"Base");
+  add("Bored subject","×0.5","Base");
+  if(S.blessings.length)add("Mentored subject","×2",S.blessings.map(esc).join(", "));
+  add("Boss subject studied","×1.5 · ×2 if all 5 right","Study");
+  add("Critical answer",`×1.5 within ${+(6*(1+.65*cnt("ember"))).toFixed(1)} s`,cnt("ember")?`Ember +${65*cnt("ember")}%`:"Base 6 s");
+  add("Streak of 3+","×1.15","Base");
+  add("Time per question",`${Math.round(BASE_TIME*(1+.3*cnt("owl")))} s`,cnt("owl")?`Owl +${30*cnt("owl")}%`:"Base");
+  if(cnt("plate"))add("Angry hits blocked",pc(.03*Math.min(10,cnt("plate"))),`Iron Plate ×${cnt("plate")}`);
+  if(has("nametag"))add("First hit per visitor","×0.5","Name Tag");
+  if(has("coin"))add("Wrong answers excused","1 per visitor","Lucky Coin");
+  if(has("ink"))add("Heal per right answer",pc(.02*cnt("ink"))+" max HP",`Vampiric Ink ×${cnt("ink")}`);
+  if(has("tipjar"))add("Max HP per right answer",`${(.25*cnt("tipjar")).toFixed(2)}% of bar`,`Tip Jar ×${cnt("tipjar")}`);
+  if(has("drinks"))add("Heal on a full bar",pc(.1*cnt("drinks"))+" max HP",`Round of Drinks${cnt("drinks")>1?` ×${cnt("drinks")}`:""}`);
+  return `<table class="boosts"><tbody>${rows.join("")}</tbody></table><p class="muted small">Multipliers stack: craved, mentored, studied, critical and streak all multiply together.</p>`;
+}
 function listView(){
   const used={pocket:S.glassUsed||0,pendant:S.pendantUsed||0},acc=S.asked?Math.round(S.correct/S.asked*100):0;
   const rel=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<li>${ico(r.id)}<div><strong>${esc(r.n)}${k>1?` ×${k}`:""}</strong><span class="muted">${esc(r.d)}${rmax(r)>1?` · ${rmax(r)===Infinity?`${k} collected`:`${k} of ${rmax(r)}`}`:""}${r.id in used?` · used ${used[r.id]} time${used[r.id]===1?"":"s"}`:""}</span></div></li>`}).join("");
@@ -1231,7 +1264,8 @@ function listView(){
     <div class="stats"><div><span class="label">Floor</span><span class="num">${S.inside?S.floor:"Camp"}</span></div><div><span class="label">Accuracy</span><span class="num">${acc}%</span></div><div><span class="label">Streak</span><span class="num">${S.bestStreak||0}</span></div></div>
     <div class="sechead"><p class="label">Pack ${packItems().length} / ${MAX_ITEMS}</p>${packItems().length?`<button class="linkbtn" data-a="dropmode">Drop items</button>`:""}</div>
     ${packItems().length?`<ul class="rlist">${packItems().map(sl=>{const it=ITEMS.find(x=>x.id===sl.id);return `<li>${ico(sl.id)}<div><strong>${esc(it.n)} ×${sl.n}</strong><span class="muted">${esc(it.d)}</span></div></li>`}).join("")}</ul>`:`<p class="muted">Your pack is empty.</p>`}
-    <p class="label">Relics and mentors</p>
+    <p class="label">How it adds up</p>${boostRows()}
+    <p class="label">Relics and mentors · ${passiveCount()} passive${passiveCount()===1?"":"s"}</p>
     ${rel||bl?`<ul class="rlist">${bl}${rel}</ul>`:`<p class="muted">No relics yet. Satisfy a visitor or open a reliquary to earn one.</p>`}
     <p class="label">Progress, newest first</p>
     ${hist.length?floorList(hist):`<p class="muted">Nothing yet. Your floors will be listed here as you descend.</p>`}
@@ -1247,8 +1281,8 @@ function footerView(){
   else if(S.screen==="battle"){nav=S.phase==="result"?`<button class="btn" data-a="next" id="nextbtn">${S.hp<=0?"Fall":S.enemy.hp<=0?"Claim victory":"Continue"}</button>`:off("Continue")}
   else if(S.screen==="hazard"){nav=S.phase==="result"?`<button class="btn" data-a="hznext" id="nextbtn">${S.hp<=0?"Fall":"Press on"}</button>`:off("Press on")}
   else if(S.screen==="lesson"){
-    if(S.phase==="done"||S.lesson.finished)nav=`<button class="btn" data-a="tent" data-i="${S.lesson.tent}" id="nextbtn">Keep learning</button><button class="btn ghost" data-a="camp">Back to camp</button>`;
-    else nav=S.phase==="result"?`<button class="btn" data-a="lnext" id="nextbtn">${S.lesson.k<LESSON.length-1?"Next question":"Finish the lesson"}</button>`:off("Next question");
+    if(S.phase==="done"||S.lesson.finished)nav=`<button class="btn" data-a="tent" data-i="${S.lesson.tent}" id="nextbtn">Keep learning</button><button class="btn ghost" data-a="camp">Return to scholars</button>`;
+    else nav=(S.phase==="result"?`<button class="btn" data-a="lnext" id="nextbtn">${S.lesson.k<LESSON.length-1?"Next question":"Finish the lesson"}</button>`:off("Next question"))+`<button class="btn ghost" data-a="camp">Return to scholars</button>`;
     if(S.phase==="ask"&&S.lesson.k===0){const t=S.camp.tents[S.lesson.tent];pin=`<p class="speech">${esc(t.line)}</p>`}}
   else if(S.screen==="camp"&&(S.campView||"hub")==="hub"){
     if(S.confirmDescend){pin=`<p class="pin"><strong>Ready to go in?</strong> There's no coming back to camp until you're knocked out.${S.gold?` Your ${S.gold} unspent gold stays with the merchant.`:""}</p>`;nav=`<button class="btn" data-a="descend">Enter</button><button class="btn ghost" data-a="notyet">Not yet</button>`}
@@ -1350,7 +1384,7 @@ function hud(compact){
     return `<div class="hud compact${S.hitMe?" shake":""}">
       <div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar"><i style="width:${S.hp/S.maxHp*100}%"></i></div><span class="num">${S.hp}/${S.maxHp}</span><span class="label cfl">${camp?`${ico("gold","ico sm")}${S.gold}`:`Floor <b>${S.floor}</b>`}</span></div>
       <div class="slots">${slots}</div>
-      <div class="relics hrow">${danger?`<span class="hdanger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Use a glowing item":""}</span>`:`<span class="hstats"><span title="Base knowledge per right answer">Pow <b>${S.power}</b></span><span title="Right answers in a row">Streak <b>${S.streak}</b></span>${S.asked?`<span title="Share of answers you got right">Right <b>${Math.round(S.correct/S.asked*100)}%</b></span>`:""}</span>`}<span class="hchips">${S.won?`<span class="chip relic" title="The Trivial Relic: a Möbius ring and portal key">${ico("trivial","ico sm")}</span>`:""}${S.blessings.map(c=>`<span class="chip bless" title="Mentor: ×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}</span>`).join("")}${relics}</span><span class="seeall">${manage?`<button class="linkbtn" data-a="manage">Done</button>`:`<button class="linkbtn" data-a="list">See all</button>`}</span></div>
+      <div class="relics hrow">${danger?`<span class="hdanger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Use a glowing item":""}</span>`:`<span class="hstats"><span title="Base knowledge per right answer">Pow <b>${S.power}</b></span><span title="Right answers in a row">Streak <b>${S.streak}</b></span>${S.asked?`<span title="Share of answers you got right">Right <b>${Math.round(S.correct/S.asked*100)}%</b></span>`:""}</span>`}<span class="hchips">${passiveCount()?`<button class="pcount" data-a="list" title="Passive relics and mentors. Tap to see how they add up">${ico("bless","ico sm")}Passives <b>${passiveCount()}</b></button>`:""}</span><span class="seeall">${manage?`<button class="linkbtn" data-a="manage">Done</button>`:`<button class="linkbtn" data-a="list">See all</button>`}</span></div>
     </div>`}
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label withico">${ico("heart","ico sm")}Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
@@ -1418,7 +1452,7 @@ function render(){
 `;
     }
     body=`<section class="room"><div class="teacher"><canvas class="tent small" width="64" height="44" data-kind="teach" data-color="${t.color}" data-seed="${L.tent+3}" aria-hidden="true"></canvas>
-      <div style="min-width:0;flex:1"><p class="label lhead"><span>${esc(t.cat)}</span><button class="linkbtn" data-a="camp">Back to camp</button></p><h2>${esc(t.name)} the ${esc(t.title)}</h2></div></div>
+      <div style="min-width:0;flex:1"><p class="label lhead"><span>${esc(t.cat)}</span></p><h2>${esc(t.name)} the ${esc(t.title)}</h2></div></div>
       ${main}${swapPanel()}</section>`;
   }else if(S.screen==="map"){
     body=`<section class="room"><div><p class="label">Floor ${S.floor}${depths()?" · the Depths":""}</p><h2>${S.floor===GOAL?"Something hums behind this door":S.doors.length===1&&S.doors[0].t==="boss"?"A great door stands alone":depths()?"The ground shifts underfoot":"Choose a passage"}</h2>${(()=>{if(S.floor===GOAL)return "";const lone=S.doors.length===1&&S.doors[0].t==="boss",opt=S.doors.some(d=>d.opt),dr=dread();
@@ -1888,7 +1922,7 @@ document.addEventListener("click",ev=>{
   else if(a==="drop")dropItem(i);
   else if(a==="tent")openTent(i);
   else if(a==="lnext")lessonNext();
-  else if(a==="camp"){S.screen="camp";if(S.lesson){S.campView="scholars";S.scholar=S.lesson.tent}S.phase=null;render()}
+  else if(a==="camp"){stopTimer();S.screen="camp";if(S.lesson){S.campView="scholars";S.scholar=S.lesson.tent}S.phase=null;render()}
   else if(a==="cview"){S.campView=b.dataset.v;S.confirmDescend=false;if(b.dataset.v==="scholars")S.scholar=null;render()}
   else if(a==="shp"){const n=Math.ceil(WARES.length/4);S.shopPage=((S.shopPage||0)+(+b.dataset.v)+n)%n;render()}
   else if(a==="pick"){S.scholar=S.scholar===i?null:i;render()}
