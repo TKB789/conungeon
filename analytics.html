@@ -621,7 +621,17 @@ footer.info .navbox .btn{margin:6px 4px}
 footer.info .navbox{width:100%}#app footer.info .navbox .btn.right{margin-left:auto}
 .btn:disabled{opacity:.4;filter:grayscale(.6)}
 footer.info .infotext{position:relative;padding-top:6px}
-footer.info .grow{float:right;margin:0 0 4px 10px;font-size:14px;border-bottom:0;color:var(--dim)}
+footer.info .grow{position:absolute;top:4px;right:6px;margin:0;padding:2px 4px;font-size:13px;line-height:1.2;border-bottom:0;color:var(--dim);z-index:1}
+footer.info .infotext{padding-top:22px!important}
+.pcount{display:inline-flex;align-items:center;gap:5px;background:none;border:0;padding:0 2px;font:inherit;font-family:var(--mono);font-size:14px;color:var(--dim);cursor:pointer;white-space:nowrap}
+.pcount b{color:var(--parch);font-weight:400}
+.pcount .ico.sm{width:14px;height:14px}
+table.boosts{width:100%;border-collapse:collapse;font-size:14px;margin:2px 0 6px}
+table.boosts th{text-align:left;font-weight:400;padding:6px 6px 6px 0;color:var(--parch)}
+table.boosts td{padding:6px 4px;vertical-align:top}
+table.boosts td:nth-child(2){color:var(--torch);white-space:nowrap}
+table.boosts td.muted{font-size:12px}
+table.boosts tr+tr{border-top:1px solid var(--line)}
 footer.info .alog p{margin:0 0 5px;line-height:1.35}
 .tipline{display:block;margin:2px 0 4px;padding:5px 8px;background:#1d1a12;color:var(--parch);border-left:3px solid #8a6a2a;
   box-shadow:0 -2px 0 0 #6a5a33,0 2px 0 0 #6a5a33,-2px 0 0 0 #6a5a33,2px 0 0 0 #6a5a33}
@@ -739,6 +749,14 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 .slots li>div{flex:1;min-width:0}
 .slotbtns{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .slots .btn{padding:6px 12px;font-size:15px;margin:4px}
+
+/* Ward Rune: the health bar glows while a ward is up. Shadows and an overlay only, so nothing moves. */
+.bar.warded{position:relative;box-shadow:0 0 0 2px #9ff0e2,0 0 12px 3px rgba(110,220,255,.7);animation:wardglow 1.6s ease-in-out infinite}
+.bar.warded>i{filter:brightness(1.15) saturate(1.1)}
+.bar.warded::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 30%,rgba(200,250,255,.55) 50%,transparent 70%);background-size:250% 100%;animation:wardsheen 2.2s linear infinite}
+@keyframes wardglow{50%{box-shadow:0 0 0 2px #c8fbff,0 0 18px 6px rgba(110,220,255,.95)}}
+@keyframes wardsheen{from{background-position:150% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.bar.warded,.bar.warded::after{animation:none}}
 
 /* ---------- Analytics Conungeon additions */
 :root{--ink:#ebe1c8;--ink-2:#a39c88;--card:#141815;--pen:#e3a548;--muted-bg:#1d1a12;--line:#3d463f;--serif:"Alegreya Sans",Georgia,serif;--sans:"Alegreya Sans",system-ui,sans-serif;--ok:#6cbcae;--bad:#cf5444;--warn:#e3a548;--hl:#3a3216;--hl-ink:#ffe08a;--paper:#141815;--grid:#2d342f;--ok-bg:#13231f;--bad-bg:#2a1210;--warn-bg:#2a2210}
@@ -962,7 +980,9 @@ const LOOT=[
  {id:"ember",n:"Warm Ember",d:"Right answers heal 1% of your max HP more.",max:3},
  {id:"table",n:"Study Group",d:"Once per visitor, tap Hint to cross out one wrong choice. Each copy adds a hint.",max:3},
  {id:"ink",n:"Vampiric Ink",d:"Three in a row heals 10% of your max HP more.",max:3},
- {id:"potion",n:"Two potions",d:"Drunk automatically when your health drops low.",item:true}];
+ {id:"potion",n:"Two potions",d:"Drunk automatically when your health drops low.",item:true},
+ {id:"ward",n:"Ward Rune",d:"Blocks the next wrong-answer hit completely. Your health bar glows while it's up. Hold up to 2.",item:true}];
+const WARD_MAX=2,itemOK=l=>l.id==="ward"?(S.wards||0)<WARD_MAX:(S.potions||0)<POTION_MAX,itemCount=id=>id==="ward"?(S.wards||0):S.potions;
 const SECS=Object.keys(VIS);
 const QBY={};MQ.forEach(q=>QBY[q.id]=q);
 const secQs=k=>MQ.filter(q=>`${q.set}-${q.sec}`===k).sort((a,b)=>a.sc-b.sc||a.seq-b.seq);
@@ -1074,9 +1094,9 @@ function grade(timeout){
     if(S.streak%3===0){const w=heal(windHeal());if(w)say(`Three in a row: a second wind. +${w} HP.`)}
   }else{
     S.streak=0;if(!V.endless)delete S.mastered[q.id];S.misses[q.id]=(S.misses[q.id]||0)+1;V.missed.push(q.id);S.carry=0;
-    const dmg=hitOf(V.k);S.hp-=dmg;S.hitMe=true;
+    const dmg=S.wards>0?0:hitOf(V.k);if(dmg){S.hp-=dmg;S.hitMe=true}else S.wards--;
     const wrongPick=S.picked.find(i=>!q.ok.includes(i)),trap=wrongPick!=null&&q.opts[wrongPick][2];
-    say(`<span class="bad">${timeout?"Time's up.":"Not quite."}</span> "${pick(QUIPS)}" ${n} hits you for ${dmg}. Answer: ${right}.${trap?`<span class="tipline"><b>The trap</b>${esc(trap)}</span>`:""}`);
+    say(`<span class="bad">${timeout?"Time's up.":"Not quite."}</span> "${pick(QUIPS)}" ${dmg?`${n} hits you for ${dmg}.`:`${ico("ward","ico sm")} Your Ward Rune absorbs ${n}'s blow${S.wards?` (${S.wards} left)`:""}.`} Answer: ${right}.${trap?`<span class="tipline"><b>The trap</b>${esc(trap)}</span>`:""}`);
     if(S.hp<=0&&V.pendant){V.pendant=false;S.hp=1;say(`${ico("pendant","ico sm")} Your heart pendant flares and keeps you on your feet with 1 HP.`)}
     if(S.hp>0&&S.hp<=S.maxHp*.35&&S.potions>0){S.potions--;const h=heal(pct(POTION));say(`${ico("potion","ico sm")} You gulp a potion without thinking. +${h} HP (${S.potions} left).`)}
   }
@@ -1102,10 +1122,11 @@ function finishVisit(){
 }
 function openSide(t){if(!S.side)return;
   if(t==="rest"){S.side=false;const h=heal(Math.ceil(S.maxHp*STONE_HEAL));say(`The healing stone hums. You recover ${h} HP.`);save();render(true);return}
-  const relics=shuffle(LOOT.filter(l=>!l.item&&cnt(l.id)<l.max)).slice(0,2),items=LOOT.filter(l=>l.item&&S.potions<POTION_MAX);
+  const relics=shuffle(LOOT.filter(l=>!l.item&&cnt(l.id)<l.max)).slice(0,2),items=shuffle(LOOT.filter(l=>l.item&&itemOK(l))).slice(0,1);
   S.reliq=relics.concat(items).slice(0,3).map(l=>l.id);S.screen="reliq";render(true)}
 function takeLoot(id){if(S.screen!=="reliq")return;const l=LOOT.find(x=>x.id===id);S.side=false;S.reliq=null;S.screen="map";
-  if(l.item){S.potions=Math.min(POTION_MAX,S.potions+2);say(`${ico("potion","ico sm")} You take two potions (${S.potions} in your pack).`)}
+  if(l.id==="ward"){S.wards=Math.min(WARD_MAX,(S.wards||0)+1);say(`${ico("ward","ico sm")} You take a Ward Rune. It hums around you, ready to block the next blow (${S.wards} held).`)}
+  else if(l.item){S.potions=Math.min(POTION_MAX,S.potions+2);say(`${ico("potion","ico sm")} You take two potions (${S.potions} in your pack).`)}
   else{S.relics.push(id);if(id==="tome"){const g=pct(cnt("tome")<=5?.15:.05);S.maxHp+=g;heal(g)}say(`${ico(id,"ico sm")} You take the ${l.n}${cnt(id)>1?` (×${cnt(id)})`:""}. ${l.d}`)}
   save();render(true)}
 function revive(){S.revives++;S.hp=S.maxHp;S.screen="battle";S.visit.pendant=true;say(`You come to on the floor. A kind bartender helps you up: revive #${S.revives}, full health. The visitor is still waiting.`);nextQ()}
@@ -1118,7 +1139,7 @@ const ico=(id,cls="ico")=>ICON[id]?`<img class="${cls}" src="${ICON[id]}" alt=""
 
 // The top: one health bar. Everything else lives in "See all".
 function hud(){
-  return `<div class="hud compact one${S.hitMe?" shake":""}"><div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar"><i style="width:${Math.max(0,S.hp)/S.maxHp*100}%"></i></div><span class="num">${Math.max(0,S.hp)}/${S.maxHp}</span><button class="linkbtn seeall" data-a="sheet" data-v="all">See all</button></div></div>`;
+  return `<div class="hud compact one${S.hitMe?" shake":""}"><div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar${S.wards>0?" warded":""}"${S.wards>0?' title="Warded: the next hit is blocked"':""}><i style="width:${Math.max(0,S.hp)/S.maxHp*100}%"></i></div><span class="num">${Math.max(0,S.hp)}/${S.maxHp}</span><button class="linkbtn seeall" data-a="sheet" data-v="all">See all</button></div></div>`;
 }
 function doorCard(k){
   const i=SECS.indexOf(k),[n,g]=VIS[k],c=mCount(k),t=SECQ[k].length,done=c===t,sc=S.endless||done?null:nextScn(k),nq=sc?scnQs(k,sc).filter(id=>!S.mastered[id]).length:0;
@@ -1159,7 +1180,7 @@ function battleView(){
 }
 function reliqView(){
   const opts=(S.reliq||[]).map(id=>{const l=LOOT.find(x=>x.id===id),k=l.item?0:cnt(id);
-    return `<button class="reward" data-a="loot" data-v="${id}">${ico(id)}<span class="rtx"><strong>${esc(l.n)}</strong><span class="label">${l.item?`Item · ${S.potions} in pack`:l.max===Infinity?(k?`Relic · ${k} owned, no limit`:"Relic · no limit"):k?`Relic · ${k} of ${l.max}`:`Relic · stacks to ${l.max}`}</span><span class="muted">${esc(l.d)}</span></span></button>`}).join("");
+    return `<button class="reward" data-a="loot" data-v="${id}">${ico(id)}<span class="rtx"><strong>${esc(l.n)}</strong><span class="label">${l.item?`Item · ${itemCount(id)} in pack`:l.max===Infinity?(k?`Relic · ${k} owned, no limit`:"Relic · no limit"):k?`Relic · ${k} of ${l.max}`:`Relic · stacks to ${l.max}`}</span><span class="muted">${esc(l.d)}</span></span></button>`}).join("");
   return `<section class="room page"><p class="label">Side room</p><h2 class="ph">A dusty reliquary</h2><p class="muted small">Choose one to keep.</p><div class="rewards">${opts||`<p class="muted">It's empty. You've collected everything it can hold.</p>`}</div></section>`;
 }
 function clearView(){
@@ -1204,7 +1225,7 @@ function sheetView(){
     <div class="stats"><div><span class="label">Mastered</span><span class="num">${totalM()}/${MQ.length}</span></div><div><span class="label">Accuracy</span><span class="num">${acc}%</span></div><div><span class="label">Streak</span><span class="num">${S.streak} <small class="muted">best ${S.bestStreak}</small></span></div></div>
     <p class="label">Expert gear · always on</p>
     <ul class="rlist"><li>${ico("pendant")}<div><strong>Heart pendant${V&&!V.pendant?" · used":""}</strong><span class="muted">Once per visitor, survive a knockout with 1 HP.</span></div></li>
-      <li>${ico("pocket")}<div><strong>Exam clock</strong><span class="muted">90 seconds per question, plus 60 seconds to read a scenario's first question. Nothing adds time, but unused time carries to the next question in the same scenario, like budgeting time on a real test.</span></div></li>      <li>${ico("potion")}<div><strong>Potions × ${S.potions}</strong><span class="muted">Found in reliquaries. You drink one automatically when your health falls below a third. Each heals ${Math.round(POTION*100)}% of your max HP.</span></div></li>
+      <li>${ico("pocket")}<div><strong>Exam clock</strong><span class="muted">90 seconds per question, plus 60 seconds to read a scenario's first question. Nothing adds time, but unused time carries to the next question in the same scenario, like budgeting time on a real test.</span></div></li>      <li>${ico("potion")}<div><strong>Potions × ${S.potions}</strong><span class="muted">Found in reliquaries. You drink one automatically when your health falls below a third. Each heals ${Math.round(POTION*100)}% of your max HP.</span></div></li>      <li>${ico("ward")}<div><strong>Ward Runes × ${S.wards||0}</strong><span class="muted">Found in reliquaries. Each blocks one wrong-answer hit completely; your health bar glows while one is ready. Hold up to ${WARD_MAX}.</span></div></li>
       <li>${ico("heart")}<div><strong>Health ${Math.max(0,S.hp)}/${S.maxHp}</strong><span class="muted">Right answers heal ${rightHeal()} HP (${Math.round((HEAL_RIGHT+.01*cnt("ember"))*100)}% of max); three in a row heals ${windHeal()} more (${Math.round((SECOND_WIND+.1*cnt("ink"))*100)}%). Wrong answers hit for ${Math.round(HIT[1]*100)}–${Math.round(HIT[3]*100)}% of max HP, by set${cnt("plate")?`, ${cnt("plate")*10}% softer with Iron Plate`:""}. Each newly mastered question adds 1% max HP. Revives: ${S.revives}.</span></div></li></ul>
     <p class="label">Loot</p>${rel?`<ul class="rlist">${rel}</ul>`:`<p class="muted small">Nothing yet. Every visitor leaves something behind when they go.</p>`}
     <p class="label">All rounds${busy?"":" · tap one to face it"}</p><div class="seclist">${SECS.map((k,i)=>`<button class="secrow${secDone(k)?" good":""}" data-a="visit" data-v="${k}" ${busy?"disabled":""}><span class="num">${k[0]}·${k[2]}</span><span class="nm">${esc(VIS[k][0])}</span><span class="muted">${mCount(k)}/${SECQ[k].length}</span></button>`).join("")}</div>

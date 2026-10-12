@@ -752,6 +752,14 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 .slots li>div{flex:1;min-width:0}
 .slotbtns{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .slots .btn{padding:6px 12px;font-size:15px;margin:4px}
+
+/* Ward Rune: the health bar glows while a ward is up. Shadows and an overlay only, so nothing moves. */
+.bar.warded{position:relative;box-shadow:0 0 0 2px #9ff0e2,0 0 12px 3px rgba(110,220,255,.7);animation:wardglow 1.6s ease-in-out infinite}
+.bar.warded>i{filter:brightness(1.15) saturate(1.1)}
+.bar.warded::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 30%,rgba(200,250,255,.55) 50%,transparent 70%);background-size:250% 100%;animation:wardsheen 2.2s linear infinite}
+@keyframes wardglow{50%{box-shadow:0 0 0 2px #c8fbff,0 0 18px 6px rgba(110,220,255,.95)}}
+@keyframes wardsheen{from{background-position:150% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion: reduce){.bar.warded,.bar.warded::after{animation:none}}
 </style>
 </head>
 <body>
@@ -1382,13 +1390,13 @@ function hud(compact){
   const used={pocket:S.glassUsed||0,pendant:S.pendantUsed||0},relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.n)}: ${esc(r.d)}${k>1?` (×${k})`:""}">${ico(r.id,"ico sm")}${compact?"":esc(r.n)}${k>1?` <b>×${k}</b>`:""}${r.id in used?` <b>· ${used[r.id]}${compact?"":" used"}</b>`:""}</span>`}).join("");
   if(compact){const camp=!S.inside;
     return `<div class="hud compact${S.hitMe?" shake":""}">
-      <div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar"><i style="width:${S.hp/S.maxHp*100}%"></i></div><span class="num">${S.hp}/${S.maxHp}</span><span class="label cfl">${camp?`${ico("gold","ico sm")}${S.gold}`:`Floor <b>${S.floor}</b>`}</span></div>
+      <div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar${S.ward?" warded":""}"${S.ward?' title="Warded: the next hit is blocked"':""}><i style="width:${S.hp/S.maxHp*100}%"></i></div><span class="num">${S.hp}/${S.maxHp}</span><span class="label cfl">${camp?`${ico("gold","ico sm")}${S.gold}`:`Floor <b>${S.floor}</b>`}</span></div>
       <div class="slots">${slots}</div>
       <div class="relics hrow">${danger?`<span class="hdanger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Use a glowing item":""}</span>`:`<span class="hstats"><span title="Base knowledge per right answer">Pow <b>${S.power}</b></span><span title="Right answers in a row">Streak <b>${S.streak}</b></span>${S.asked?`<span title="Share of answers you got right">Right <b>${Math.round(S.correct/S.asked*100)}%</b></span>`:""}</span>`}<span class="hchips">${passiveCount()?`<button class="pcount" data-a="list" title="Passive relics and mentors. Tap to see how they add up">${ico("bless","ico sm")}Passives <b>${passiveCount()}</b></button>`:""}</span><span class="seeall">${manage?`<button class="linkbtn" data-a="manage">Done</button>`:`<button class="linkbtn" data-a="list">See all</button>`}</span></div>
     </div>`}
   return `<div class="hud${S.hitMe?" shake":""}">
     <div><div class="hpline"><span class="label withico">${ico("heart","ico sm")}Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
-      <div class="bar"><i style="width:${S.hp/S.maxHp*100}%"></i></div>
+      <div class="bar${S.ward?" warded":""}"${S.ward?' title="Warded: the next hit is blocked"':""}><i style="width:${S.hp/S.maxHp*100}%"></i></div>
       <div class="label" style="margin-top:6px">Power ${S.power} · Streak ${S.streak}</div></div>
     ${["camp","lesson","shop"].includes(S.screen)?`<div class="floor"><div class="label">Gold</div><b class="withico">${ico("gold","ico md")}${S.gold}</b></div>`:`<div class="floor"><div class="label">Floor</div><b>${S.floor}</b>${S.floor<=GOAL&&!S.won?`<span class="muted num"> /${GOAL}</span>`:""}</div>`}
     <div class="kit">
