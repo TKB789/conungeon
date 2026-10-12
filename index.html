@@ -653,6 +653,7 @@ footer.info.big{height:58dvh}
 #app.run .sgrid{flex:1 1 auto;grid-auto-rows:1fr;align-items:stretch;max-height:520px}
 #app.run .wgrid{flex:1 1 auto;grid-auto-rows:1fr}
 #app.run .rewards{flex:1 1 auto;grid-auto-rows:1fr;max-height:420px}
+#app.run .rewards.one{flex:none;grid-auto-rows:auto;min-height:120px}
 #app.run .hubgrid{flex:none}
 #app.run .campscene{flex:1 1 0;min-height:80px;max-height:56vw;width:auto;height:auto;max-width:100%;align-self:center}
 #app.titlemode .scene{flex:1 1 0;min-height:90px;max-height:56vw;width:auto;height:auto;max-width:100%;align-self:center}
@@ -1186,13 +1187,19 @@ function nextTurn(){
     S.floorEvent=`Satisfied ${e.n.replace(/^Rowdy /,"")}${e.boss?" (boss)":e.elite?" (rowdy)":""}`;
     if(e.boss){S.since=0;S.bossCount=(S.bossCount||0)+1;
       if(e.optional){const pool=RELICS.filter(r=>cnt(r.id)<rmax(r));if(pool.length){const r=pick(pool);S.relics.push(r.id);if(r.id==="tome")tomeBoost();S.log.unshift(`You faced the guardian before it came for you. Bonus relic: ${r.n}.`);S.floorEvent+=` · bonus ${r.n}`}}}
-    S.rewardOpts=offerRewards(3,false);S.rewardTitle="A gift from the table";S.rewardNote="Choose one to keep.";S.screen="reward";render();return;
+    // Ordinary visitors leave one thing; rowdy tables and bosses let you choose from three
+    const many=e.boss||e.elite;S.rewardOpts=offerRewards(many?3:1,false,!!e.boss);
+    if(!S.rewardOpts.length){S.log.unshift("Your pack is full and your relics are maxed, so there's nothing more to carry.");advance();return}
+    S.rewardTitle=many?(e.boss?"The boss's hoard":"A gift from the table"):`${e.n} leaves something behind`;S.rewardNote=many?"Choose one to keep.":"Take it with you.";S.screen="reward";render();return;
   }
   S.phase="choose";S.offer=makeOffer(e);render();
 }
-function offerRewards(n,relicOnly){
+function offerRewards(n,relicOnly,carry){
   const relics=shuffle(RELICS.filter(r=>cnt(r.id)<rmax(r))).map(r=>({...r,kind:"relic",owned:cnt(r.id)}));
-  const items=shuffle(ITEMS).map(i=>({...i,kind:"item"}));
+  // Bosses (carry=true) only offer items you can actually carry; everyone else drops by luck
+  const items=shuffle(ITEMS.filter(i=>!carry||canAdd(i.id))).map(i=>({...i,kind:"item"}));
+  // A single drop (ordinary visitors): one relic or one item, no choice
+  if(n===1){const pool=[relics[0],items[0]].filter(Boolean);return pool.length?[pick(pool)]:[]}
   if(relicOnly==="reliquary")return relics.slice(0,2).concat(items).slice(0,n);
   if(relicOnly)return relics.length?relics.slice(0,n):items.slice(0,n);
   return relics.slice(0,Math.min(2,n-1)).concat(items).slice(0,n);
@@ -1305,7 +1312,7 @@ function footerView(){
     else if(N.phase==="ask")nav=`<button class="btn" disabled>Next question</button>`;
     else if(N.k<NOOK_Q-1)nav=`<button class="btn" data-a="nooknext" id="nextbtn">Next question</button>`;
     else nav=`<button class="btn" data-a="nookleave" id="nextbtn">${N.from==="boss"?"Back to the boss":"Leave the nook"}</button>`}
-  else if(S.screen==="reward")nav=`<button class="btn ghost" data-a="advance">Take nothing</button>`;
+  else if(S.screen==="reward")nav=(S.rewardOpts.length===1?`<button class="btn" data-a="reward" data-i="0" id="nextbtn" ${S.rewardOpts[0].kind==="item"&&!canAdd(S.rewardOpts[0].id)?"disabled":""}>Take it</button><button class="btn ghost" data-a="advance">Leave it</button>`:`<button class="btn ghost" data-a="advance">Take nothing</button>`);
   return strip(nav,pin+alog(LOGN));
 }
 // Title page bottom strip: resume or start fresh, with the last run's details in the log area
@@ -1497,7 +1504,7 @@ function render(){
 </section>`;
   }else if(S.screen==="reward"){
     body=`<section class="room page"><h2 class="ph">${esc(S.rewardTitle)}</h2><p class="label">${esc(S.rewardNote)}</p>
-      <div class="rewards">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&!canAdd(r.id);
+      <div class="rewards${S.rewardOpts.length===1?" one":""}">${S.rewardOpts.map((r,i)=>{const full=r.kind==="item"&&!canAdd(r.id);
         return `<button class="reward ${r.kind==="item"?"it":""}" data-a="reward" data-i="${i}" ${full?"disabled":""}>${ico(r.id)}<span class="rtx"><strong>${esc(r.n)}</strong><span class="label">${r.kind==="relic"?(rmax(r)===1?"Relic · one of a kind":r.owned?`Relic · ${rmax(r)===Infinity?`${r.owned} owned, no limit`:`${r.owned} of ${rmax(r)}`}`:`Relic · ${rmax(r)===Infinity?"no limit":`stacks to ${rmax(r)}`}`):full?"Item · pack full":"Item"}</span><span class="muted">${esc(r.d)}</span></span></button>`}).join("")}</div></section>`;
   }else if(S.screen==="battle"){
     const e=S.enemy;
@@ -1861,7 +1868,7 @@ function buryDoor(cv){
 }
 function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>{drawCave(cv,t);if(cv.dataset.buried)buryDoor(cv)})}
 const STORY_P=["One morning, strange portals tore open in the ground all over the world. Each one led down a deep, dark staircase, with a low rumble and hungry eyes glaring up from below.", "It took months for the world to agree on a plan, a new world record for agreeing on anything. Finally, a brave soul from every country stepped inside.", "They found monsters of every shape and size, all with an endless, terrible thirst for… knowledge?", "It turns out the portals lead to an interdimensional trivia bar. Twisting passages wind from den to den, where visitors from across the multiverse gather for trivia night. This season, for the very first time, the theme is Earth. Can you guess the bar's name? That's right: <b>the Conungeon</b>, the Dungeon of Conundrums.", "Why do they look so menacing? No idea. They don't judge your face, so don't judge theirs.", "They <i>do</i> judge your answers, though. Life is busy across a dozen dimensions, and trivia night is the one night they get with their friends. So when an actual Earthling sits down and doesn't know things about their own planet, it kind of harshes the vibe. <i>\"Oh, come ON. Do you even live on the surface?!\"</i>", "Answer well and they'll share gifts from beyond. Anger them too much and they'll knock you out cold and send you back up to the surface. On floor 100, the bar's Quizmaster, the Super Computaur, hosts the final round.", "Now curious minds from all over the world gather at the portal's mouth, trading notes and working up their courage. How deep will you dare to go?"];
-const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study before a boss question.</b> When a boss picks a subject, you can study it first, once per subject per boss: five calm questions with no clock, healing as you answer. Studying makes your right answers in that subject fill the boss's bar ×1.5 for the rest of the fight, or ×2 with a perfect five. A perfect five also makes that subject's scholar your mentor (or offers a swap).</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's own knowledge bar: 15% on the first floors, rising to 95% by floor 100. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
+const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study before a boss question.</b> When a boss picks a subject, you can study it first, once per subject per boss: five calm questions with no clock, healing as you answer. Studying makes your right answers in that subject fill the boss's bar ×1.5 for the rest of the fight, or ×2 with a perfect five. A perfect five also makes that subject's scholar your mentor (or offers a swap).</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's own knowledge bar: 15% on the first floors, rising to 95% by floor 100. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar and they leave you one gift (rowdy tables and bosses let you choose from three), plus max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
 let titleSheet=null;
 // Analytics Conungeon: a passcode-gated link (remembered on this device once entered)
 const ANA_URL="analytics.html",ANA_CODE="1234";
@@ -1940,7 +1947,7 @@ document.addEventListener("click",ev=>{
   else if(a==="askdescend"){S.confirmDescend=true;render()}
   else if(a==="notyet"){S.confirmDescend=false;render()}
   else if(a==="descend"){S.confirmDescend=false;descend()}
-  else if(a==="onward"){S.screen="map";S.endless=true;S.rewardOpts=offerRewards(3,false);S.rewardTitle="The Computaur's spare parts";S.rewardNote="Take one, then keep descending.";S.screen="reward";saveGame();render()}
+  else if(a==="onward"){S.screen="map";S.endless=true;S.rewardOpts=offerRewards(3,false,true);S.rewardTitle="The Computaur's spare parts";S.rewardNote="Take one, then keep descending.";S.screen="reward";saveGame();render()}
 });
 document.addEventListener("keydown",ev=>{
   if(S&&S.screen==="hazard"&&S.phase==="ask"){const n=+ev.key;if(n>=1&&n<=4)answer(S.q.opts[n-1]);return}
