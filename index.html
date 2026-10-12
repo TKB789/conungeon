@@ -824,20 +824,21 @@ const bossFor=f=>{if(f===GOAL)return COMPUTAUR;const k=S.bossCount||0;return k<B
 const RELICS=[
  {id:"quill",n:"Sharp Quill",d:"+5% knowledge on every right answer"},
  {id:"tome",n:"Thick Tome",d:"+4% max HP (at least 10) and heal that much. No limit, but after 10 tomes each adds +1%",max:Infinity},
- {id:"coin",n:"Lucky Coin",d:"Excuses 1 wrong answer per visitor",max:1},
- {id:"owl",n:"Owl Feather",d:"+30% more time on every question"},
- {id:"ink",n:"Vampiric Ink",d:"Heal 2% of your max HP on every right answer",max:5},
- {id:"ember",n:"Ember Gem",d:"+65% wider critical-hit window (answer fast for ×1.5)"},
- {id:"lens",n:"Scholar's Lens",d:"+0.5× knowledge with a subject a visitor craves"},
+ {id:"coin",n:"Lucky Coin",d:"Every angry hit has a 20% chance to miss you entirely",max:1},
+ {id:"owl",n:"Owl Feather",d:"+30% more time on every question",max:5},
+ {id:"ink",n:"Vampiric Ink",d:"Heal 2% of your max HP on every right answer",max:3},
+ {id:"ember",n:"Ember Gem",d:"+25% wider critical-hit window (answer fast for ×1.5)",max:4},
+ {id:"lens",n:"Scholar's Lens",d:"+0.5× knowledge with a subject a visitor craves",max:4},
  {id:"plate",n:"Iron Plate",d:"Blocks 3% of every angry hit (up to 30% with 10)"},
  {id:"pocket",n:"Pocket Hourglass",d:"When time runs out, an Hourglass from your pack is used automatically",max:1},
  {id:"pendant",n:"Heart Pendant",d:"If a hit would knock you out, you drink a Healing Draught from your pack instead",max:1},
  {id:"table",n:"Ask the Table",d:"Once per visitor, the table hints at an answer. They're right 3 times in 4",max:2},
- {id:"nametag",n:"Name Tag",d:"\"Hi, I'm an Earthling.\" The first angry hit from each visitor is halved",max:1},
+ {id:"nametag",n:"Name Tag",d:"\"Hi, I'm an Earthling.\" The first angry hit from each visitor is 25% softer",max:1},
  {id:"tipjar",n:"Tip Jar",d:"Every right answer adds max HP equal to 0.25% of the visitor's knowledge bar (per jar)",max:3},
- {id:"coaster",n:"Lucky Coaster",d:"Once per visitor, a wrong answer is crossed out and you guess again",max:1},
- {id:"drinks",n:"Round of Drinks",d:"Heal 10% of your max HP whenever you fill a visitor's knowledge bar"}
+ {id:"coaster",n:"Lucky Coaster",d:"At rowdy tables and bosses, your first wrong answer is crossed out and you guess again",max:1},
+ {id:"drinks",n:"Round of Drinks",d:"Heal 10% of your max HP whenever you fill a visitor's knowledge bar",max:3}
 ];
+const EMBER=.25,critWin=()=>6*(1+EMBER*cnt("ember"));
 const rmax=r=>(typeof r==="string"?RELICS.find(x=>x.id===r):r).max||RELIC_MAX;
 const ITEMS=[
  {id:"potion",n:"Healing Draught",sn:"Draught",d:"Heal 30% of max HP",bt:false},
@@ -879,7 +880,7 @@ const ICON={};
 try{if(typeof document!=="undefined"&&document.createElement){for(const [id,rows] of Object.entries(SPRITES)){const cv=document.createElement("canvas");cv.width=cv.height=12;const g=cv.getContext&&cv.getContext("2d");if(!g)continue;
   rows.forEach((row,y)=>[...row].forEach((ch,x)=>{if(PAL[ch]){g.fillStyle=PAL[ch];g.fillRect(x,y,1,1)}}));ICON[id]=cv.toDataURL()}}}catch(e){}
 const ico=(id,cls="ico")=>ICON[id]?`<img class="${cls}" src="${ICON[id]}" alt="" aria-hidden="true">`:"";
-const HP_SHARE=.02, HP_FADE=120, ANGER_BASE=.15, ANGER_DEPTH=.8, TIPJAR=.0025; // max HP from visitors and Tip Jars, kept modest so hits stay meaningful // max HP gained per visitor = this share of their thirst (knowledge bar)
+const HP_SHARE=.02, HP_FADE=120, ANGER_BASE=.13, ANGER_DEPTH=1.9, ANGER_CURVE=2.2, ANGER_CAP=1.8, LATE_BAR=1.4, COIN_MISS=.2, NAMETAG=.25, TIPJAR=.0025; // max HP from visitors and Tip Jars, kept modest so hits stay meaningful // max HP gained per visitor = this share of their thirst (knowledge bar)
 const BASE_TIME=20, MAX_ITEMS=4, STACK=10, RELIC_MAX=10;
 // The pack holds 4 slots (one per item type). Copies of the same item stack in one slot, up to 10.
 const packItems=()=>{const m=[];(S.items||[]).map(x=>typeof x==="string"?{id:x,n:1}:x).filter(x=>ITEMS.some(i=>i.id===x.id)).forEach(x=>{const h=m.find(y=>y.id===x.id);if(h)h.n=Math.min(99,h.n+x.n);else m.push({id:x.id,n:x.n})});return S.items=m};
@@ -1032,14 +1033,16 @@ function makeDoors(){
 }
 
 // ---------- Questions
+// Difficulty by table and depth. Near the top: visitors 75% easy / 25% medium, rowdy tables 75% medium / 25% hard,
+// bosses 75% hard / 25% medium. By floor 100 it shifts to visitors 30/55/15 (easy/medium/hard), rowdy 40/60 (medium/hard), bosses 95% hard.
+function diffMix(kind,f){const t=Math.min(f,GOAL)/GOAL;
+  if(kind==="boss")return {e:0,h:.75+.2*t};
+  if(kind==="elite")return {e:0,h:.25+.35*t};
+  return {e:.75-.45*t,h:Math.max(0,t-.4)*.25};
+}
 function diffFor(){
-  const f=S.floor, e=S.enemy;
-  // Bosses test you with hard questions instead of a giant knowledge bar.
-  if(e&&e.boss)return "h";
-  let i=f<=4?0:f<=19?1:Math.random()<.5?1:2;   // easy early, then medium, then a medium/hard mix
-  if(e&&e.elite)i=Math.min(2,i+1);              // rowdy tables ask one level harder
-  if(Math.random()<.2)i=Math.max(0,i-1);
-  return "emh"[i];
+  const e=S.screen==="battle"?S.enemy:null,m=diffMix(e&&e.boss?"boss":e&&e.elite?"elite":"visitor",S.floor),r=Math.random();
+  return r<m.e?"e":r<m.e+m.h?"h":"m";
 }
 // Questions you've already seen are remembered across runs (in this browser), so a new run
 // after dying deals new ones. Once a category runs dry, its seen questions are allowed again.
@@ -1099,21 +1102,21 @@ function startFight(t){
   const [n,g,hit]=boss?bossFor(f):pick(mix);
   // Monsters keep getting tougher the deeper you go, so every run has a natural limit.
   // Knowledge bars grow about as fast as Power (+1 per floor): a plain right answer chips off roughly 1/8 at any depth
-  let hp=25+f*8+Math.floor(f*f/30);
-  if(f>GOAL)hp=Math.round(hp*(1+(f-GOAL)*.03));
-  if(elite)hp=Math.round(hp*1.3);
-  if(boss)hp=Math.round(hp*1.15);
-  // A wrong answer costs a share of the visitor's own knowledge bar, so a hit is never bigger than the bar itself.
-  // The share grows with depth: angrier visitors deeper down.
-  let share=ANGER_BASE+ANGER_DEPTH*Math.min(f,GOAL)/GOAL;   // 15% of the bar on floor 1, up to 95% by floor 100
+  // A standard visitor's knowledge for this floor. Rowdy tables and bosses carry more.
+  let std=25+f*8+Math.floor(f*f/30);
+  if(f>GOAL)std=Math.round(std*(1+(f-GOAL)*.03));
+  const dt=Math.min(f,GOAL)/GOAL, base=Math.round(std*(elite?1.3:boss?1.15:1));
+  // Deeper visitors know more: bars grow faster than Power late on, so deep fights last longer.
+  let hp=Math.round(base*(1+LATE_BAR*dt*dt));
+  // Anger: a wrong answer costs a share of a standard visitor's bar. Gentle up top (13%), steep in the last third
+  // (about 60% by floor 60, capped at 180%). Rowdy tables and bosses hit 35% harder. Never more than 95% of their own bar.
+  let share=Math.min(ANGER_CAP,ANGER_BASE+ANGER_DEPTH*Math.pow(dt,ANGER_CURVE));
   if(f>GOAL)share+=Math.min(.3,(f-GOAL)*.003);
-  if(elite||boss)share*=1.2;
-  share=Math.min(.95,share);
-  const atk=Math.max(2,Math.round(hp*share));
+  const atk=Math.max(2,Math.min(Math.round(hp*.95),Math.round(std*share*(elite||boss?1.35:1))));
   const cats=shuffle(available());
-  S.enemy={n:(elite?"Rowdy ":"")+n,g,hit,hp,max:hp,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0,optional};
+  S.enemy={n:(elite?"Rowdy ":"")+n,g,hit,hp,max:hp,base,atk,elite,boss,weak:cats[0],resist:cats[1],coins:0,optional};
   S.screen="battle";S.phase="choose";S.offer=makeOffer(S.enemy);
-  S.log.unshift(S.enemy.boss?`${S.enemy.n}, guardian of the floor, slams the table. "Answer me!" Only hard questions at this table.`:`${S.enemy.n} waves you over to their table.`);render();
+  S.log.unshift(S.enemy.boss?`${S.enemy.n}, guardian of the floor, slams the table. "Answer me!" Mostly hard questions at this table.`:`${S.enemy.n} waves you over to their table.`);render();
 }
 const QUIPS=["Do you even live on the surface?!","Come ON. That's your own planet!","We traveled four dimensions for this.","Ugh. You're harshing our vibe.","Even Gerald knew that one, and Gerald eats rocks.","That's going on the scoreboard. In red.","Did you just guess? You just guessed.","My larva could answer that.","Trivia night is SACRED.","Who let the Earthling sit at our table?","We studied YOUR planet for this!","I waited all cycle for this night.","Bold choice. Wrong, but bold.","Somebody fetch this human a book.","Oh no. Oh no no no.","And you call yourselves the dominant species?","We paid a cover charge for this.","Please tell me that was a joke.","All of my tentacles are facepalming.","I'm telling the Quizmaster about this."];
 const GIFT_CHANCE=.1, GIFT_POOL=["potion","potion","glass","halve","ward"];
@@ -1163,7 +1166,7 @@ function answer(opt){
   if(S.screen==="hazard")return hazardAnswer(opt);
   if(S.phase!=="ask")return;
   const e=S.enemy, ok=opt===S.q.right, elapsed=S.tMax-S.tLeft;
-  if(!ok&&opt!==null&&(e.coaster||0)<cnt("coaster")&&!S.q.removed.includes(opt)){e.coaster=(e.coaster||0)+1;S.q.removed.push(opt);S.log.unshift(`Your Lucky Coaster flips. "${esc(opt)}"? Nope. Guess again.`);render();return}
+  if(!ok&&opt!==null&&(e.elite||e.boss)&&(e.coaster||0)<cnt("coaster")&&!S.q.removed.includes(opt)){e.coaster=(e.coaster||0)+1;S.q.removed.push(opt);S.log.unshift(`Your Lucky Coaster flips. "${esc(opt)}"? Nope. Guess again.`);render();return}
   stopTimer();S.phase="result";S.asked++;S.picked=opt;
   if(S.q.tip)S.log.unshift(tipLine(S.q));
   if(ok){
@@ -1173,11 +1176,11 @@ function answer(opt){
     else if(S.q.cat===e.resist){dmg*=.5;notes.push("bored")}
     if(S.blessings&&S.blessings.includes(S.q.cat)){dmg*=2;notes.push("mentored")}
     const stm=e.studyMult&&e.studyMult[S.q.cat];if(stm){dmg*=stm;notes.push(`studied ×${stm}`)}
-    if(elapsed<=6*(1+.65*cnt("ember"))){dmg*=1.5;notes.push("critical")}
+    if(elapsed<=critWin()){dmg*=1.5;notes.push("critical")}
     if(S.streak>=3){dmg*=1.15;notes.push(`streak ${S.streak} +15%`)}
     dmg=Math.round(dmg);e.hp=Math.max(0,e.hp-dmg);
     if(has("ink"))S.hp=Math.min(S.maxHp,S.hp+Math.ceil(S.maxHp*.02*cnt("ink")));
-    if(has("tipjar")){const k=cnt("tipjar")*Math.max(1,Math.round(e.max*TIPJAR));S.maxHp+=k;S.hp+=k}
+    if(has("tipjar")){const k=cnt("tipjar")*Math.max(1,Math.round((e.base||e.max)*TIPJAR));S.maxHp+=k;S.hp+=k}
     S.log.unshift(`<span class="good">Correct.</span> ${esc(e.n)} soaks up ${dmg} knowledge${notes.length?" ("+notes.join(", ")+")":""}.`);
     visitorGift(e);
     S.hitFoe=true;
@@ -1185,8 +1188,8 @@ function answer(opt){
     S.streak=0;S.rough=(S.rough||0)+1;S.missed.push({q:S.q.text,a:S.q.right});
     const why=opt===null?"Time runs out.":"Wrong.";
     if(S.ward){S.ward=false;S.log.unshift(`<span class="bad">${why}</span> Your Ward Rune absorbs the blow. The answer was ${esc(S.q.right)}.`)}
-    else if((e.coins||0)<Math.min(1,cnt("coin"))){e.coins=(e.coins||0)+1;S.log.unshift(`<span class="bad">${why}</span> The Lucky Coin spins and the blow misses. The answer was ${esc(S.q.right)}.`)}
-    else{let dmg=hitFor(e),tag="";if(has("nametag")&&!e.tagged){e.tagged=true;dmg=Math.ceil(dmg/2);tag=" Your Name Tag softens the blow."}
+    else if(has("coin")&&Math.random()<COIN_MISS){S.log.unshift(`<span class="bad">${why}</span> The Lucky Coin spins and the blow misses. The answer was ${esc(S.q.right)}.`)}
+    else{let dmg=hitFor(e),tag="";if(has("nametag")&&!e.tagged){e.tagged=true;dmg=Math.ceil(dmg*(1-NAMETAG));tag=" Your Name Tag softens the blow."}
       S.hp=Math.max(0,S.hp-dmg);S.killer=e.n;S.log.unshift(`<span class="bad">${why}</span> ${esc(e.n)} ${esc(e.hit)}. −${dmg} HP.${tag} The answer was ${esc(S.q.right)}.`);S.quip=pick(QUIPS);S.log.unshift(`<i>"${S.quip}"</i>`);S.hitMe=true;faintGuard()}
   }
   render();
@@ -1196,7 +1199,7 @@ function nextTurn(){
   if(S.hp<=0){knockedOut();return}
   if(e.hp<=0){
     // Growing tougher: monsters hit harder each floor, so each win raises your max HP too.
-    const gain=Math.max(2,Math.round(e.max*HP_SHARE*Math.max(.25,1-Math.min(S.floor,GOAL)/HP_FADE)*(e.boss?2:e.elite?1.5:1)));S.maxHp+=gain;S.hp=e.boss?S.maxHp:Math.min(S.maxHp,S.hp+gain);
+    const gain=Math.max(2,Math.round((e.base||e.max)*HP_SHARE*Math.max(.25,1-Math.min(S.floor,GOAL)/HP_FADE)*(e.boss?2:e.elite?1.5:1)));S.maxHp+=gain;S.hp=e.boss?S.maxHp:Math.min(S.maxHp,S.hp+gain);
     if(depths()&&!e.boss){const h=Math.ceil(S.maxHp*.15);S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`In the Depths, every victory steadies you. +${h} HP.`)}
     if(has("drinks")&&!e.boss){const h=Math.ceil(S.maxHp*.1*cnt("drinks"));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You buy the table a round of drinks. +${h} HP.`)}
     S.log.unshift(`${esc(e.n)}'s thirst for knowledge is quenched. +${gain} max HP${e.boss?", and you're fully healed":""}.`);
@@ -1276,12 +1279,12 @@ function boostRows(){
   add("Bored subject","×0.5","Base");
   if(S.blessings.length)add("Mentored subject","×2",S.blessings.map(esc).join(", "));
   add("Boss subject studied","×1.5 · ×2 if all 5 right","Study");
-  add("Critical answer",`×1.5 within ${+(6*(1+.65*cnt("ember"))).toFixed(1)} s`,cnt("ember")?`Ember +${65*cnt("ember")}%`:"Base 6 s");
+  add("Critical answer",`×1.5 within ${+(critWin()).toFixed(1)} s`,cnt("ember")?`Ember +${Math.round(EMBER*100)*cnt("ember")}%`:"Base 6 s");
   add("Streak of 3+","×1.15","Base");
   add("Time per question",`${Math.round(BASE_TIME*(1+.3*cnt("owl")))} s`,cnt("owl")?`Owl +${30*cnt("owl")}%`:"Base");
   if(cnt("plate"))add("Angry hits blocked",pc(.03*Math.min(10,cnt("plate"))),`Iron Plate ×${cnt("plate")}`);
-  if(has("nametag"))add("First hit per visitor","×0.5","Name Tag");
-  if(has("coin"))add("Wrong answers excused","1 per visitor","Lucky Coin");
+  if(has("nametag"))add("First hit per visitor",`${pc(NAMETAG)} softer`,"Name Tag");
+  if(has("coin"))add("Angry hits that miss",pc(COIN_MISS),"Lucky Coin");
   if(has("ink"))add("Heal per right answer",pc(.02*cnt("ink"))+" max HP",`Vampiric Ink ×${cnt("ink")}`);
   if(has("tipjar"))add("Max HP per right answer",`${(.25*cnt("tipjar")).toFixed(2)}% of bar`,`Tip Jar ×${cnt("tipjar")}`);
   if(has("drinks"))add("Heal on a full bar",pc(.1*cnt("drinks"))+" max HP",`Round of Drinks${cnt("drinks")>1?` ×${cnt("drinks")}`:""}`);
@@ -1372,7 +1375,10 @@ function saveGame(label){
 }
 // Saves from before the new question bank may name subjects that no longer exist.
 // Older saves earned Power only from visitors; catch them up to the depth-based rule (+1 per floor)
-function fixPower(){if(!S||S.powV2)return;S.powV2=1;if(S.inside)S.power=Math.max(S.power||6,6+(S.floor-1))}
+function fixPower(){if(!S)return;
+  // Relic caps changed: trim anything a saved run holds beyond the new limits
+  if(S.relics){const seen={};S.relics=S.relics.filter(id=>{const r=RELICS.find(x=>x.id===id);if(!r)return false;seen[id]=(seen[id]||0)+1;return seen[id]<=rmax(r)})}
+  if(S.powV2)return;S.powV2=1;if(S.inside)S.power=Math.max(S.power||6,6+(S.floor-1))}
 function fixSubjects(){fixPower();const ren=c=>c==="Sports"?"Sports & Games":c,ok=c=>CATS.includes(c);
   if(S.camp&&S.camp.tents)S.camp.tents.forEach(t=>{t.cat=ren(t.cat)});S.blessings=(S.blessings||[]).map(ren);if(S.enemy){S.enemy.weak=ren(S.enemy.weak);S.enemy.resist=ren(S.enemy.resist)}if(S.offer)S.offer=S.offer.map(ren);if(S.q)S.q.cat=ren(S.q.cat);
   if(S.camp&&S.camp.tents&&!S.camp.tents.every(t=>ok(t.cat))){const old=S.camp.tents;S.camp=makeCamp();}
@@ -1536,7 +1542,7 @@ function render(){
     let mid="";
     if(S.phase==="choose"){
       const mOf=c=>{const w=c===e.weak,r=c===e.resist,b=S.blessings.includes(c),st=(e.studyMult&&e.studyMult[c])||1,m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1)*st;const tags=[w?"craved":r?"bored":"",b?"mentored":"",st>1?"studied":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")};
-      if(e.boss)mid=`<p class="label">The boss picks the subject</p><div class="cats one"><button class="cat bosspick ${S.offer[0]===e.weak?"w":S.offer[0]===e.resist?"r":""}" data-a="cat" data-c="${esc(S.offer[0])}"><strong>${S.offer[0]}</strong><span class="m">${mOf(S.offer[0])} · hard question · tap to start</span></button></div><p class="muted small">Tap the subject or Ready when you are; the clock starts then. ${(Array.isArray(e.studied)?e.studied:[]).includes(S.offer[0])?" You've already studied this subject for this boss.":" Or study it first (once per subject): five calm questions with no clock, healing as you go. Studying makes right answers in this subject fill the boss's bar ×1.5, or ×2 with a perfect five."}</p>`;
+      if(e.boss)mid=`<p class="label">The boss picks the subject</p><div class="cats one"><button class="cat bosspick ${S.offer[0]===e.weak?"w":S.offer[0]===e.resist?"r":""}" data-a="cat" data-c="${esc(S.offer[0])}"><strong>${S.offer[0]}</strong><span class="m">${mOf(S.offer[0])} · mostly hard · tap to start</span></button></div><p class="muted small">Tap the subject or Ready when you are; the clock starts then. ${(Array.isArray(e.studied)?e.studied:[]).includes(S.offer[0])?" You've already studied this subject for this boss.":" Or study it first (once per subject): five calm questions with no clock, healing as you go. Studying makes right answers in this subject fill the boss's bar ×1.5, or ×2 with a perfect five."}</p>`;
       else mid=`<p class="label">${e.elite?"Rowdy table: pick one of two subjects":"Pick a subject"}</p><div class="cats${e.elite?" two":""}">${S.offer.map(c=>{const w=c===e.weak,r=c===e.resist;return `<button class="cat ${w?"w":r?"r":""}" data-a="cat" data-c="${c}"><strong>${c}</strong><span class="m">${(()=>{const b=S.blessings.includes(c),m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1);const tags=[w?"craved":r?"bored":"",b?"mentored":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")})()}</span></button>`}).join("")}</div>`;
     }else{
       const q=S.q, done=S.phase==="result";
@@ -1893,7 +1899,7 @@ function buryDoor(cv){
 }
 function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>{drawCave(cv,t);if(cv.dataset.buried)buryDoor(cv)})}
 const STORY_P=["One morning, strange portals tore open in the ground all over the world. Each one led down a deep, dark staircase, with a low rumble and hungry eyes glaring up from below.", "It took months for the world to agree on a plan, a new world record for agreeing on anything. Finally, a brave soul from every country stepped inside.", "They found monsters of every shape and size, all with an endless, terrible thirst for… knowledge?", "It turns out the portals lead to an interdimensional trivia bar. Twisting passages wind from den to den, where visitors from across the multiverse gather for trivia night. This season, for the very first time, the theme is Earth. Can you guess the bar's name? That's right: <b>the Conungeon</b>, the Dungeon of Conundrums.", "Why do they look so menacing? No idea. They don't judge your face, so don't judge theirs.", "They <i>do</i> judge your answers, though. Life is busy across a dozen dimensions, and trivia night is the one night they get with their friends. So when an actual Earthling sits down and doesn't know things about their own planet, it kind of harshes the vibe. <i>\"Oh, come ON. Do you even live on the surface?!\"</i>", "Answer well and they'll share gifts from beyond. Anger them too much and they'll knock you out cold and send you back up to the surface. On floor 100, the bar's Quizmaster, the Super Computaur, hosts the final round.", "Now curious minds from all over the world gather at the portal's mouth, trading notes and working up their courage. How deep will you dare to go?"];
-const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study before a boss question.</b> When a boss picks a subject, you can study it first, once per subject per boss: five calm questions with no clock, healing as you answer. Studying makes your right answers in that subject fill the boss's bar ×1.5 for the rest of the fight, or ×2 with a perfect five. A perfect five also makes that subject's scholar your mentor (or offers a swap).</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's own knowledge bar: 15% on the first floors, rising to 95% by floor 100. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar and they leave you one gift (rowdy tables and bosses let you choose from three), plus max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
+const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study before a boss question.</b> When a boss picks a subject, you can study it first, once per subject per boss: five calm questions with no clock, healing as you answer. Studying makes your right answers in that subject fill the boss's bar ×1.5 for the rest of the fight, or ×2 with a perfect five. A perfect five also makes that subject's scholar your mentor (or offers a swap).</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's knowledge: gentle near the top, climbing steeply past floor 50. Rowdy tables and bosses hit 35% harder, but a hit is never more than 95% of their bar. Deeper visitors also know more, so late fights take more right answers. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar and they leave you one gift (rowdy tables and bosses let you choose from three), plus max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask mostly hard questions, with some medium. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
 let titleSheet=null;
 // Analytics Conungeon: a passcode-gated link (remembered on this device once entered)
 const ANA_URL="analytics.html",ANA_CODE="1234";
