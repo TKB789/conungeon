@@ -761,6 +761,21 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 @keyframes wardglow{50%{box-shadow:0 0 0 2px #c8fbff,0 0 18px 6px rgba(110,220,255,.95)}}
 @keyframes wardsheen{from{background-position:150% 0}to{background-position:-100% 0}}
 @media (prefers-reduced-motion: reduce){.bar.warded,.bar.warded::after{animation:none}}
+
+/* Drop mode: red frame, striped slots and a banner, so it never looks like the normal pack */
+.hud.dropping{--f:var(--blood);background:linear-gradient(#2a1412,#1a0e0c)}
+.slot.drop{background:repeating-linear-gradient(135deg,#2a1210 0 6px,#1c0d0b 6px 12px);color:#ffd0c8;--f:#cf3b3b;animation:dropwob 1.2s steps(2) infinite}
+.slot.drop .x{position:absolute;top:3px;left:5px;font-size:9px;color:#ff8170;letter-spacing:.1em;line-height:1}
+.slot.drop.sel{--f:#ff8170;box-shadow:0 0 0 2px #ff8170,0 0 12px 2px rgba(255,110,90,.6);animation:none}
+.slot.drop.dim{opacity:.4;animation:none}
+@keyframes dropwob{50%{transform:translateY(-1px)}}
+.dropbar{display:flex;align-items:center;justify-content:space-between;gap:8px;height:32px;box-sizing:border-box;padding:0 2px;font-family:var(--mono);font-size:13px;color:#ff9a8a}
+.dropbar .dtx{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dropbar.ask .dtx{color:var(--parch);font-size:14px}
+.dropbar .dbtns{display:flex;gap:6px;flex:none}
+.dbtn{font:inherit;font-family:var(--mono);font-size:13px;line-height:1;padding:5px 10px;border:2px solid #6a5a33;background:#141815;color:var(--parch);cursor:pointer}
+.dbtn.red{border-color:#cf3b3b;background:#4a1714;color:#ffd0c8}
+@media (prefers-reduced-motion: reduce){.slot.drop{animation:none}}
 </style>
 </head>
 <body>
@@ -870,7 +885,10 @@ const BASE_TIME=20, MAX_ITEMS=4, STACK=10, RELIC_MAX=10;
 const packItems=()=>{const m=[];(S.items||[]).map(x=>typeof x==="string"?{id:x,n:1}:x).filter(x=>ITEMS.some(i=>i.id===x.id)).forEach(x=>{const h=m.find(y=>y.id===x.id);if(h)h.n=Math.min(99,h.n+x.n);else m.push({id:x.id,n:x.n})});return S.items=m};
 const canAdd=id=>{const it=packItems();return it.some(x=>x.id===id&&x.n<STACK)||it.length<MAX_ITEMS};
 function addItem(id){if(!canAdd(id))return false;const s=S.items.find(x=>x.id===id&&x.n<STACK);if(s)s.n++;else S.items.push({id,n:1});return true}
-function dropItem(i){const s=packItems()[i];if(!s)return;const it=ITEMS.find(x=>x.id===s.id);S.items.splice(i,1);S.log.unshift(`You leave ${s.n>1?`${s.n} ${it.n}s`:`the ${it.n}`} behind.`);render()}
+// Drop one (or the whole stack), then leave drop mode so the next tap uses items again
+function dropItem(i,count){const s=packItems()[i];if(!s)return;const it=ITEMS.find(x=>x.id===s.id),k=Math.min(s.n,count||s.n);
+  s.n-=k;if(s.n<=0)S.items.splice(S.items.indexOf(s),1);S.managePack=false;S.dropAsk=null;
+  S.log.unshift(`You leave ${k>1?`${k} ${it.n}s`:`a ${it.n}`} behind.`);render()}
 
 // ---------- State
 let S, timerId=null;
@@ -1349,7 +1367,7 @@ function saveGame(label){
   const inside=S.inside&&S.screen!=="lesson";
   const where=label||(inside?(S.screen==="rest"?`Healing stone, floor ${S.floor}`:`Floor ${S.floor}${S.phase==="ask"?" · mid-question":""}`):"Base camp");
   const keep=inside?{}:{q:null,lesson:null,enemy:null,offer:null,phase:null,picked:null};
-  try{localStorage.setItem(saveKey(SLOT),JSON.stringify({...S,...keep,showList:false,showCamps:false,managePack:false,confirmDescend:false,hitMe:false,hitFoe:false,
+  try{localStorage.setItem(saveKey(SLOT),JSON.stringify({...S,...keep,showList:false,showCamps:false,managePack:false,dropAsk:null,confirmDescend:false,hitMe:false,hitFoe:false,
     screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,40),savedAt:Date.now(),savedWhere:where}))}catch(e){}
 }
 // Saves from before the new question bank may name subjects that no longer exist.
@@ -1384,6 +1402,13 @@ function endRun(win){
 
 // ---------- Render
 const ROOM={fight:["x","Visitor","A table that wants answers"],elite:["X","Rowdy table","Harder questions, angrier visitors"],rest:["~","Healing Stone","Heal and stay on this floor · +1 Power"],nook:["?","Study Nook","Heal by studying · +1 Power"],treasure:["$","Reliquary","Relic or item · stay on this floor"],boss:["&","Boss","Guardian of the floor"]};
+// Drop mode: a red banner says you're in it; tapping an item asks before anything is thrown away
+function dropBar(){
+  const P=packItems(),k=S.dropAsk,sl=k!=null&&P[k];
+  if(sl){const it=ITEMS.find(x=>x.id===sl.id);
+    return `<div class="dropbar ask" role="alert"><span class="dtx">Drop ${esc(it.sn||it.n)}${sl.n>1?` ×${sl.n}`:""}?</span><span class="dbtns"><button class="dbtn red" data-a="dropok" data-v="1">${sl.n>1?"Drop 1":"Drop"}</button>${sl.n>1?`<button class="dbtn red" data-a="dropok" data-v="all">All ${sl.n}</button>`:""}<button class="dbtn" data-a="dropno">Keep</button></span></div>`}
+  return `<div class="dropbar"><span class="dtx">Drop mode · tap an item to drop</span><span class="dbtns"><button class="dbtn" data-a="manage">Done</button></span></div>`;
+}
 function hud(compact){
   const P=packItems(),full=P.length>=MAX_ITEMS,manage=!!S.managePack;
   // In danger (low health, or the next hit could knock you out), items that can help glow.
@@ -1392,23 +1417,23 @@ function hud(compact){
   const shown=MAX_ITEMS;
   const slots=Array.from({length:shown},(_,i)=>{const sl=P[i];if(!sl)return `<span class="slot empty">Empty</span>`;
     const it=ITEMS.find(x=>x.id===sl.id);
-    return manage?`<button class="slot drop" data-a="drop" data-i="${i}" aria-label="Drop ${esc(it.n)}">${ico(sl.id)}<span class="nm">${esc(it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}<span class="x">Drop</span></button>`
+    return manage?`<button class="slot drop${S.dropAsk===i?" sel":S.dropAsk!=null?" dim":""}" data-a="drop" data-i="${i}" aria-label="Drop ${esc(it.n)}">${ico(sl.id)}<span class="nm">${esc(compact&&it.sn||it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}<span class="x">Drop</span></button>`
       :`<button class="slot${helps(sl.id)?" help":""}" data-a="item" data-i="${i}" title="${esc(it.d)}">${ico(sl.id)}<span class="nm">${esc(compact&&it.sn||it.n)}</span>${sl.n>1?`<b>×${sl.n}</b>`:""}</button>`}).join("");
   const used={pocket:S.glassUsed||0,pendant:S.pendantUsed||0},relics=RELICS.filter(r=>has(r.id)).map(r=>{const k=cnt(r.id);return `<span class="chip relic" title="${esc(r.n)}: ${esc(r.d)}${k>1?` (×${k})`:""}">${ico(r.id,"ico sm")}${compact?"":esc(r.n)}${k>1?` <b>×${k}</b>`:""}${r.id in used?` <b>· ${used[r.id]}${compact?"":" used"}</b>`:""}</span>`}).join("");
   if(compact){const camp=!S.inside;
-    return `<div class="hud compact${S.hitMe?" shake":""}">
+    return `<div class="hud compact${S.hitMe?" shake":""}${manage?" dropping":""}">
       <div class="crow"><span class="withico">${ico("heart","ico sm")}</span><div class="bar${S.ward?" warded":""}"${S.ward?' title="Warded: the next hit is blocked"':""}><i style="width:${S.hp/S.maxHp*100}%"></i></div><span class="num">${S.hp}/${S.maxHp}</span><span class="label cfl">${camp?`${ico("gold","ico sm")}${S.gold}`:`Floor <b>${S.floor}</b>`}</span></div>
       <div class="slots">${slots}</div>
-      <div class="relics hrow">${danger?`<span class="hdanger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Use a glowing item":""}</span>`:`<span class="hstats"><span title="Base knowledge per right answer">Pow <b>${S.power}</b></span><span title="Right answers in a row">Streak <b>${S.streak}</b></span>${S.asked?`<span title="Share of answers you got right">Right <b>${Math.round(S.correct/S.asked*100)}%</b></span>`:""}</span>`}<span class="hchips">${passiveCount()?`<button class="pcount" data-a="list" title="Passive relics and mentors. Tap to see how they add up">${ico("bless","ico sm")}Passives <b>${passiveCount()}</b></button>`:""}</span><span class="seeall">${manage?`<button class="linkbtn" data-a="manage">Done</button>`:`<button class="linkbtn" data-a="list">See all</button>`}</span></div>
+      ${manage?dropBar():`<div class="relics hrow">${danger?`<span class="hdanger">${lethal?"Knockout risk!":"Health low!"}${P.some(sl=>helps(sl.id))?" Use a glowing item":""}</span>`:`<span class="hstats"><span title="Base knowledge per right answer">Pow <b>${S.power}</b></span><span title="Right answers in a row">Streak <b>${S.streak}</b></span>${S.asked?`<span title="Share of answers you got right">Right <b>${Math.round(S.correct/S.asked*100)}%</b></span>`:""}</span>`}<span class="hchips">${passiveCount()?`<button class="pcount" data-a="list" title="Passive relics and mentors. Tap to see how they add up">${ico("bless","ico sm")}Passives <b>${passiveCount()}</b></button>`:""}</span><span class="seeall"><button class="linkbtn" data-a="list">See all</button></span></div>`}
     </div>`}
-  return `<div class="hud${S.hitMe?" shake":""}">
+  return `<div class="hud${S.hitMe?" shake":""}${manage?" dropping":""}">
     <div><div class="hpline"><span class="label withico">${ico("heart","ico sm")}Health${S.ward?" · warded":""}</span><span class="num">${S.hp} / ${S.maxHp}</span></div>
       <div class="bar${S.ward?" warded":""}"${S.ward?' title="Warded: the next hit is blocked"':""}><i style="width:${S.hp/S.maxHp*100}%"></i></div>
       <div class="label" style="margin-top:6px">Power ${S.power} · Streak ${S.streak}</div></div>
     ${["camp","lesson","shop"].includes(S.screen)?`<div class="floor"><div class="label">Gold</div><b class="withico">${ico("gold","ico md")}${S.gold}</b></div>`:`<div class="floor"><div class="label">Floor</div><b>${S.floor}</b>${S.floor<=GOAL&&!S.won?`<span class="muted num"> /${GOAL}</span>`:""}</div>`}
     <div class="kit">
       <div class="kithead"><span class="label">Pack</span><span class="kitright"><span class="label ${full?"full":""}">${P.length} / ${MAX_ITEMS}${full?" · full":""}</span>${P.length?`<button class="linkbtn" data-a="manage">${manage?"Done":"Drop items"}</button>`:""}</span></div>
-      ${danger?`<div class="danger">${lethal?"Danger! The next hit could knock you out.":"Danger! Your health is low."}${P.some(sl=>helps(sl.id))?" Glowing items can help.":""}</div>`:""}
+      ${manage?dropBar():""}${danger?`<div class="danger">${lethal?"Danger! The next hit could knock you out.":"Danger! Your health is low."}${P.some(sl=>helps(sl.id))?" Glowing items can help.":""}</div>`:""}
       <div class="slots">${slots}</div>
       ${relics||S.blessings.length||S.won?`${compact?"":`<div class="kithead"><span class="label">Relics · passive</span><button class="linkbtn" data-a="list">See all</button></div>`}<div class="relics">${S.blessings.map(c=>`<span class="chip bless" title="Mentor: ×2 knowledge with ${esc(c)}">${ico("bless","ico sm")}${compact?esc(c):`Mentor: the ${esc(TITLES[c]||"Sage")}`}</span>`).join("")}${relics}${S.won?`<span class="chip relic" title="Grants bragging rights. Does nothing else. Congratulations.">${ico("trivial","ico sm")}Trivial Relic</span>`:""}</div>`:""}
     </div>
@@ -1910,7 +1935,7 @@ document.addEventListener("click",ev=>{
   else if(a==="analytics"){if(anaOpen())location.href=ANA_URL;else{titleSheet="lock";render();setTimeout(()=>{const i=$("#pass");if(i)i.focus()},50)}}
   else if(a==="list"){S.showList=!S.showList;render()}
   else if(a==="camps"){S.showCamps=!S.showCamps;render()}
-  else if(a==="dropmode"){S.showList=false;S.managePack=true;render()}
+  else if(a==="dropmode"){S.showList=false;S.managePack=true;S.dropAsk=null;render()}
   else if(a==="rels"){S.showRels=!S.showRels;render()}
   else if(a==="story"){storyOpen=!storyOpen;render()}
   else if(a==="newgame"){confirmNew=true;render()}
@@ -1933,8 +1958,10 @@ document.addEventListener("click",ev=>{
   else if(a==="menu"){stopTimer();if(S)S.showCamps=false;S=null;render();window.scrollTo&&scrollTo({top:0})}
   else if(a==="item")useItem(i);
   else if(a==="hznext")hazardNext();
-  else if(a==="manage"){S.managePack=!S.managePack;render()}
-  else if(a==="drop")dropItem(i);
+  else if(a==="manage"){S.managePack=!S.managePack;S.dropAsk=null;render()}
+  else if(a==="drop"){S.dropAsk=S.dropAsk===i?null:i;render()}
+  else if(a==="dropok"){const k=S.dropAsk;S.dropAsk=null;if(k!=null)dropItem(k,b.dataset.v==="all"?Infinity:1)}
+  else if(a==="dropno"){S.dropAsk=null;render()}
   else if(a==="tent")openTent(i);
   else if(a==="lnext")lessonNext();
   else if(a==="camp"){stopTimer();S.screen="camp";if(S.lesson){S.campView="scholars";S.scholar=S.lesson.tent}S.phase=null;render()}
