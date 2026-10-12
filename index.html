@@ -791,9 +791,9 @@ const RELICS=[
  {id:"quill",n:"Sharp Quill",d:"+5% knowledge on every right answer"},
  {id:"tome",n:"Thick Tome",d:"+4% max HP (at least 10) and heal that much. No limit, but after 10 tomes each adds +1%",max:Infinity},
  {id:"coin",n:"Lucky Coin",d:"Excuses 1 wrong answer per visitor",max:1},
- {id:"owl",n:"Owl Feather",d:"+6 seconds on every question"},
+ {id:"owl",n:"Owl Feather",d:"+30% more time on every question"},
  {id:"ink",n:"Vampiric Ink",d:"Heal 2% of your max HP on every right answer",max:5},
- {id:"ember",n:"Ember Gem",d:"+4 seconds to the critical-hit window"},
+ {id:"ember",n:"Ember Gem",d:"+65% wider critical-hit window (answer fast for ×1.5)"},
  {id:"lens",n:"Scholar's Lens",d:"+0.5× knowledge with a subject a visitor craves"},
  {id:"plate",n:"Iron Plate",d:"Blocks 3% of every angry hit (up to 30% with 10)"},
  {id:"pocket",n:"Pocket Hourglass",d:"When time runs out, an Hourglass from your pack is used automatically",max:1},
@@ -808,7 +808,7 @@ const rmax=r=>(typeof r==="string"?RELICS.find(x=>x.id===r):r).max||RELIC_MAX;
 const ITEMS=[
  {id:"potion",n:"Healing Draught",sn:"Draught",d:"Heal 30% of max HP",bt:false},
  {id:"halve",n:"Scroll of Halving",sn:"Scroll",d:"Remove two wrong answers",bt:true},
- {id:"glass",n:"Hourglass",sn:"Hourglass",d:"Add 15 seconds to the current question",bt:true},
+ {id:"glass",n:"Hourglass",sn:"Hourglass",d:"Add 75% more time to the current question",bt:true},
  {id:"ward",n:"Ward Rune",sn:"Ward Rune",d:"Block the next hit completely",bt:false}
 ];
 
@@ -959,14 +959,14 @@ const WARES=[
   {id:"potion",n:"Healing Draught",cost:12,d:"Heal 30% of max HP",kind:"item"},
   {id:"ward",n:"Ward Rune",cost:15,d:"Block the next hit completely",kind:"item"},
   {id:"halve",n:"Scroll of Halving",cost:10,d:"Remove two wrong answers",kind:"item"},
-  {id:"glass",n:"Hourglass",cost:8,d:"Add 15 seconds to a question",kind:"item"},
-  {id:"vigor",icon:"heart",n:"Tome of Vigor",cost:30,d:"+10 max HP for this descent",kind:"tome"},
-  {id:"insight",icon:"tome",n:"Tome of Insight",cost:25,d:"+2 power for this descent",kind:"tome"}
+  {id:"glass",n:"Hourglass",cost:8,d:"Add 75% more time to a question",kind:"item"},
+  {id:"vigor",icon:"heart",n:"Tome of Vigor",cost:30,d:"+30% max HP for this descent",kind:"tome"},
+  {id:"insight",icon:"tome",n:"Tome of Insight",cost:25,d:"+10% knowledge on every right answer this descent",kind:"tome"}
 ];
 function buy(id){
   const w=WARES.find(x=>x.id===id);if(!w||S.gold<w.cost)return;
   if(w.kind==="item"){if(!addItem(w.id))return}
-  else{if(S.bought[w.id])return;S.bought[w.id]=1;if(w.id==="vigor"){S.maxHp+=10;S.hp+=10}else S.power+=2}
+  else{if(S.bought[w.id])return;S.bought[w.id]=1;if(w.id==="vigor"){const g=Math.max(10,Math.round(S.maxHp*.3));S.maxHp+=g;S.hp+=g}}
   S.gold-=w.cost;S.log.unshift(`You buy a ${w.n} for ${w.cost} gold.`);render();
 }
 function descend(){
@@ -1031,7 +1031,7 @@ const HAZARD={
   crevasse:{title:"The ground splits open",short:"Answer right to leap across. Miss and you fall in.",text:"A crevasse tears open in front of you. Answer correctly to leap across. Answer wrong and you fall in, climbing out battered.",ok:0,bad:.2,killer:"a crevasse",okLine:"You leap the crevasse and land clean.",badLine:"You fall into the crevasse and claw your way back out."}
 };
 const depths=()=>S.floor>GOAL;
-function startHazard(i,kind){S.hzDoor=i;S.hz=kind;S.screen="hazard";S.q=getQuestion(pick(available()),"h");S.phase="ask";S.tMax=BASE_TIME+6*cnt("owl");S.tLeft=S.tMax;render();startTimer()}
+function startHazard(i,kind){S.hzDoor=i;S.hz=kind;S.screen="hazard";S.q=getQuestion(pick(available()),"h");S.phase="ask";S.tMax=Math.round(BASE_TIME*(1+.3*cnt("owl")));S.tLeft=S.tMax;render();startTimer()}
 function hazardAnswer(opt){
   if(S.phase!=="ask")return;stopTimer();S.phase="result";S.picked=opt;S.asked++;
   if(S.q.tip)S.log.unshift(tipLine(S.q));
@@ -1098,14 +1098,14 @@ function faintGuard(){
 // Pocket Hourglass: running out of time spends an Hourglass instead
 function autoGlass(){
   if(!has("pocket")||!["battle","hazard"].includes(S.screen)||S.phase!=="ask"||!takeOne("glass"))return false;
-  S.tMax+=15;S.tLeft=15;S.glassUsed=(S.glassUsed||0)+1;S.log.unshift("Your Pocket Hourglass flips an Hourglass for you. +15 seconds.");render();startTimer();return true;
+  {const g=Math.round(BASE_TIME*.75);S.tMax+=g;S.tLeft=g;S.glassUsed=(S.glassUsed||0)+1;S.log.unshift(`Your Pocket Hourglass flips an Hourglass for you. +${g} seconds.`)};render();startTimer();return true;
 }
 function askTable(){
   const e=S.enemy,q=S.q;if(S.screen!=="battle"||S.phase!=="ask"||!e||q.lean||(e.tableUsed||0)>=cnt("table"))return;
   e.tableUsed=(e.tableUsed||0)+1;const wrong=q.opts.filter(o=>o!==q.right&&!q.removed.includes(o));
   q.lean=Math.random()<.75||!wrong.length?q.right:pick(wrong);S.log.unshift(`You ask the table. A few heads nod toward "${esc(q.lean)}".`);render();
 }
-function chooseCat(c){S.quip=null;S.q=getQuestion(c);S.phase="ask";S.tMax=BASE_TIME+6*cnt("owl");S.tLeft=S.tMax;render();startTimer()}
+function chooseCat(c){S.quip=null;S.q=getQuestion(c);S.phase="ask";S.tMax=Math.round(BASE_TIME*(1+.3*cnt("owl")));S.tLeft=S.tMax;render();startTimer()}
 function startTimer(){
   stopTimer();const t0=performance.now(),start=S.tLeft;
   timerId=setInterval(()=>{
@@ -1131,13 +1131,13 @@ function answer(opt){
   if(S.q.tip)S.log.unshift(tipLine(S.q));
   if(ok){
     S.correct++;S.streak++;S.bestStreak=Math.max(S.bestStreak,S.streak);
-    let dmg=S.power*(1+.05*cnt("quill")), notes=[];
+    let dmg=S.power*(1+.05*cnt("quill")+(S.bought&&S.bought.insight?.1:0)), notes=[];
     if(S.q.cat===e.weak){dmg*=2+.5*cnt("lens");notes.push("craved")}
     else if(S.q.cat===e.resist){dmg*=.5;notes.push("bored")}
     if(S.blessings&&S.blessings.includes(S.q.cat)){dmg*=2;notes.push("mentored")}
     const stm=e.studyMult&&e.studyMult[S.q.cat];if(stm){dmg*=stm;notes.push(`studied ×${stm}`)}
-    if(elapsed<=6+4*cnt("ember")){dmg*=1.5;notes.push("critical")}
-    if(S.streak>=3){dmg+=3;notes.push(`streak ${S.streak}`)}
+    if(elapsed<=6*(1+.65*cnt("ember"))){dmg*=1.5;notes.push("critical")}
+    if(S.streak>=3){dmg*=1.15;notes.push(`streak ${S.streak} +15%`)}
     dmg=Math.round(dmg);e.hp=Math.max(0,e.hp-dmg);
     if(has("ink"))S.hp=Math.min(S.maxHp,S.hp+Math.ceil(S.maxHp*.02*cnt("ink")));
     if(has("tipjar")){const k=cnt("tipjar")*Math.max(1,Math.round(e.max*TIPJAR));S.maxHp+=k;S.hp+=k}
@@ -1195,7 +1195,7 @@ function useItem(i){
   if(id==="potion"){if(S.hp>=S.maxHp)return;const h=Math.max(12,Math.round(S.maxHp*.3));S.hp=Math.min(S.maxHp,S.hp+h);S.log.unshift(`You drink a Healing Draught. +${h} HP.`)}
   else if(id==="ward"){if(S.ward)return;S.ward=true;S.log.unshift("A Ward Rune glows around you.")}
   else if(id==="halve"){if(!["battle","hazard"].includes(S.screen)||S.phase!=="ask")return;S.q.removed=S.q.opts.filter(o=>o!==S.q.right).slice(0,2);S.log.unshift("The scroll burns away two lies.")}
-  else if(id==="glass"){if(!["battle","hazard"].includes(S.screen)||S.phase!=="ask")return;S.tMax+=15;S.tLeft+=15;startTimer();S.log.unshift("Sand flows backward. +15 seconds.")}
+  else if(id==="glass"){if(!["battle","hazard"].includes(S.screen)||S.phase!=="ask")return;{const g=Math.round(BASE_TIME*.75);S.tMax+=g;S.tLeft+=g;startTimer();S.log.unshift(`Sand flows backward. +${g} seconds.`)}}
   slot.n--;if(slot.n<=0)S.items.splice(i,1);render();if(S.phase==="ask"&&(S.screen==="battle"||S.screen==="hazard"))startTimer();
 }
 const RUNS_KEY="conungeon-runs";
@@ -1305,7 +1305,7 @@ function saveGame(label){
 }
 // Saves from before the new question bank may name subjects that no longer exist.
 // Older saves earned Power only from visitors; catch them up to the depth-based rule (+1 per floor)
-function fixPower(){if(!S||S.powV2)return;S.powV2=1;if(S.inside)S.power=Math.max(S.power||6,6+(S.floor-1)+(S.bought&&S.bought.insight?2:0))}
+function fixPower(){if(!S||S.powV2)return;S.powV2=1;if(S.inside)S.power=Math.max(S.power||6,6+(S.floor-1))}
 function fixSubjects(){fixPower();const ren=c=>c==="Sports"?"Sports & Games":c,ok=c=>CATS.includes(c);
   if(S.camp&&S.camp.tents)S.camp.tents.forEach(t=>{t.cat=ren(t.cat)});S.blessings=(S.blessings||[]).map(ren);if(S.enemy){S.enemy.weak=ren(S.enemy.weak);S.enemy.resist=ren(S.enemy.resist)}if(S.offer)S.offer=S.offer.map(ren);if(S.q)S.q.cat=ren(S.q.cat);
   if(S.camp&&S.camp.tents&&!S.camp.tents.every(t=>ok(t.cat))){const old=S.camp.tents;S.camp=makeCamp();}

@@ -950,14 +950,14 @@ const MAX_HP=40, POTION_MAX=5, SIDE_CHANCE=.5, STONE_HEAL=.4;
 const HEAL_RIGHT=.05, SECOND_WIND=.2, POTION=.35;   // heals, as shares of max HP
 const pct=f=>Math.max(1,Math.round(S.maxHp*f));
 const rightHeal=()=>pct(HEAL_RIGHT+.01*cnt("ember")), windHeal=()=>pct(SECOND_WIND+.1*cnt("ink"));
-const HIT={1:6,2:8,3:10};                                  // damage per wrong answer, by midterm
+const HIT={1:.15,2:.2,3:.25};                              // wrong-answer hit as a share of max HP, by set
 const VIS={
  "1-1":["The Forecast Phantom","F"],"1-2":["The Regression Golem","R"],"1-3":["The Imputation Imp","I"],"1-4":["The Lasso Basilisk","L"],
  "2-1":["The Classifier Cyclops","C"],"2-2":["The Outlier Ogre","O"],"2-3":["The Residual Specter","S"],"2-4":["The Ridge Wyvern","W"],
  "3-1":["The Cross-Validation Hydra","H"],"3-2":["The ARIMA Lich","A"],"3-3":["The Missing-Data Mimic","M"],"3-4":["The Elastic-Net Kraken","K"]};
 // Loot visitors leave behind: relics work automatically and stack up to their max
 const LOOT=[
- {id:"plate",n:"Iron Plate",d:"Wrong answers hit you for 1 less.",max:4},
+ {id:"plate",n:"Iron Plate",d:"Wrong answers hit you 10% softer.",max:4},
  {id:"tome",n:"Thick Tome",d:"+15% max HP, and heal that much now. No limit, but after 5 tomes each adds +5%.",max:Infinity},
  {id:"ember",n:"Warm Ember",d:"Right answers heal 1% of your max HP more.",max:3},
  {id:"table",n:"Study Group",d:"Once per visitor, tap Hint to cross out one wrong choice. Each copy adds a hint.",max:3},
@@ -989,7 +989,7 @@ function save(){try{localStorage.setItem(SAVE,JSON.stringify(S))}catch(e){}}
 function load(){try{const d=JSON.parse(localStorage.getItem(SAVE)||"null");return d&&d.mastered?fix(d):null}catch(e){return null}}
 const cnt=id=>S.relics.filter(x=>x===id).length;
 // Endless challenge (after mastering everything): each cleared visitor makes the next hit 1 harder every 2 visits
-const hitOf=k=>Math.max(2,HIT[k[0]]+(S.endless?Math.floor(S.endless.visits/2):0)-cnt("plate"));
+const hitOf=k=>Math.max(1,Math.round(S.maxHp*(HIT[k[0]]+(S.endless?.025*Math.floor(S.endless.visits/2):0))*(1-.1*cnt("plate"))));
 const allDone=()=>SECS.every(secDone);
 const RUNS="ana-conungeon-runs";
 function loadRuns(){try{return JSON.parse(localStorage.getItem(RUNS)||"[]")}catch(e){return []}}
@@ -1205,7 +1205,7 @@ function sheetView(){
     <p class="label">Expert gear · always on</p>
     <ul class="rlist"><li>${ico("pendant")}<div><strong>Heart pendant${V&&!V.pendant?" · used":""}</strong><span class="muted">Once per visitor, survive a knockout with 1 HP.</span></div></li>
       <li>${ico("pocket")}<div><strong>Exam clock</strong><span class="muted">90 seconds per question, plus 60 seconds to read a scenario's first question. Nothing adds time, but unused time carries to the next question in the same scenario, like budgeting time on a real test.</span></div></li>      <li>${ico("potion")}<div><strong>Potions × ${S.potions}</strong><span class="muted">Found in reliquaries. You drink one automatically when your health falls below a third. Each heals ${Math.round(POTION*100)}% of your max HP.</span></div></li>
-      <li>${ico("heart")}<div><strong>Health ${Math.max(0,S.hp)}/${S.maxHp}</strong><span class="muted">Right answers heal ${rightHeal()} HP (${Math.round((HEAL_RIGHT+.01*cnt("ember"))*100)}% of max); three in a row heals ${windHeal()} more (${Math.round((SECOND_WIND+.1*cnt("ink"))*100)}%). Each newly mastered question adds 1% max HP. Revives: ${S.revives}.</span></div></li></ul>
+      <li>${ico("heart")}<div><strong>Health ${Math.max(0,S.hp)}/${S.maxHp}</strong><span class="muted">Right answers heal ${rightHeal()} HP (${Math.round((HEAL_RIGHT+.01*cnt("ember"))*100)}% of max); three in a row heals ${windHeal()} more (${Math.round((SECOND_WIND+.1*cnt("ink"))*100)}%). Wrong answers hit for ${Math.round(HIT[1]*100)}–${Math.round(HIT[3]*100)}% of max HP, by set${cnt("plate")?`, ${cnt("plate")*10}% softer with Iron Plate`:""}. Each newly mastered question adds 1% max HP. Revives: ${S.revives}.</span></div></li></ul>
     <p class="label">Loot</p>${rel?`<ul class="rlist">${rel}</ul>`:`<p class="muted small">Nothing yet. Every visitor leaves something behind when they go.</p>`}
     <p class="label">All rounds${busy?"":" · tap one to face it"}</p><div class="seclist">${SECS.map((k,i)=>`<button class="secrow${secDone(k)?" good":""}" data-a="visit" data-v="${k}" ${busy?"disabled":""}><span class="num">${k[0]}·${k[2]}</span><span class="nm">${esc(VIS[k][0])}</span><span class="muted">${mCount(k)}/${SECQ[k].length}</span></button>`).join("")}</div>
     ${weak.length?`<p class="label">Missed most, not yet mastered</p><div class="review">${weak.map(x=>`<div><p>${x.q.q}</p><p class="good">${x.q.ok.map(i=>esc(x.q.opts[i][0])).join("; ")}</p><p class="muted small">Missed ${x.n}×</p></div>`).join("")}</div>`:""}
