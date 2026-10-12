@@ -724,7 +724,7 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 .door{transition:none}
 #app.run .cats.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 #app.run .cats.one{grid-template-columns:1fr;max-height:120px}
-.cat.bosspick{cursor:default;--f:var(--torch)}
+.cat.bosspick{--f:var(--torch)}
 .cat.bosspick strong{font-size:22px}
 .small{font-size:14.5px;line-height:1.35}
 .swapbox{margin-top:8px;padding:8px 10px;background:#141815;--f:var(--torch);box-shadow:0 -3px 0 0 var(--f),0 3px 0 0 var(--f),-3px 0 0 0 var(--f),3px 0 0 0 var(--f)}
@@ -737,6 +737,11 @@ footer.info .tipline{font-size:14px;line-height:1.35}
 #app.run .doors.n4 .door small{font-size:12px}
 #app.run .doors.n4 .cave{max-width:52%}
 #app.run .doors.n4 .door small{line-height:1.15}
+#app.run .hzt{height:2.7em;overflow:hidden;font-size:15px;line-height:1.35;margin:0}
+.slots li{align-items:center}
+.slots li>div{flex:1;min-width:0}
+.slotbtns{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.slots .btn{padding:6px 12px;font-size:15px;margin:4px}
 </style>
 </head>
 <body>
@@ -924,7 +929,7 @@ function swapMentor(c){const t=S.swapOffer;if(!t)return;S.swapOffer=null;if(S.le
 // Each right answer heals; a perfect five makes that subject's scholar your mentor (or offers a swap).
 const NOOK_Q=5, NOOK_HEAL=.05;
 function openNook(from){stopTimer();const e=S.enemy;
-  if(from==="boss"){e.studied=true;S.nook={from,cat:S.offer[0],phase:"ask",k:0,score:0,healed:0};S.screen="nook";nookQuestion();return}
+  if(from==="boss"){e.studied=(Array.isArray(e.studied)?e.studied:[]).concat(S.offer[0]);S.nook={from,cat:S.offer[0],phase:"ask",k:0,score:0,healed:0};S.screen="nook";nookQuestion();return}
   S.nook={from,phase:"pick",offer:shuffle(available()).slice(0,3),k:0,score:0,healed:0};S.screen="nook";S.swapOffer=null;render()}
 function nookStart(c){S.nook.cat=c;S.nook.phase="ask";nookQuestion()}
 function nookQuestion(){const N=S.nook;S.q=getQuestion(N.cat,N.from==="boss"?"h":pick(["m","m","h"]));N.phase="ask";S.picked=null;render()}
@@ -935,7 +940,8 @@ function nookAnswer(opt){const N=S.nook;if(N.phase!=="ask")return;N.phase="resul
   if(N.k>=NOOK_Q-1)finishNook();saveGame();render()}
 function nookNext(){S.nook.k++;nookQuestion()}
 function finishNook(){const N=S.nook,t=tentOf(N.cat);
-  S.log.unshift(`<b>Study session: ${N.score} of ${NOOK_Q}.</b> You healed ${N.healed} HP.`);
+  const sm=N.score===NOOK_Q?2:1.5;if(N.from==="boss"&&S.enemy){S.enemy.studyMult=S.enemy.studyMult||{};S.enemy.studyMult[N.cat]=sm}
+  S.log.unshift(`<b>Study session: ${N.score} of ${NOOK_Q}.</b> You healed ${N.healed} HP. Right answers in ${esc(N.cat)} now fill this boss's bar ×${sm}${N.score===NOOK_Q?" (doubled for a perfect session)":" for studying"}.`);
   if(N.score<NOOK_Q||!t)return;
   if(S.blessings.includes(N.cat))S.log.unshift(`A note arrives from ${t.name} the ${t.title}: "Perfect! I knew you had it in you."`);
   else if(S.blessings.length<MAX_BLESSINGS){S.blessings.push(N.cat);S.log.unshift(`A note arrives from base camp: ${t.name} the ${t.title} is now your mentor. ×2 knowledge with ${N.cat}.`)}
@@ -983,7 +989,7 @@ function makeDoors(){
   if(!calm&&dread()>=1) return [{t:"boss"}];
   // A healing stone and a reliquary appear together, and only once you've satisfied a visitor since the last pair.
   const pair=S.pairOK&&Math.random()<PAIR_CHANCE;
-  const doors=pair?[{t:pick(["fight","elite"])},{t:"rest"},{t:"nook"},{t:"treasure"}]:shuffle([{t:"fight"},{t:"elite"},{t:pick(["fight","elite"])}]);
+  const doors=pair?[{t:pick(["fight","elite"])},{t:"rest"},{t:"treasure"}]:shuffle([{t:"fight"},{t:"elite"},{t:pick(["fight","elite"])}]);
   if(!calm&&Math.random()<dread()){const i=doors.findIndex(d=>d.t==="fight"||d.t==="elite");doors.splice(i,1,{t:"boss",opt:true})}
   return doors;
 }
@@ -1021,8 +1027,8 @@ function getQuestion(cat,dd){
 // ---------- Rooms
 // ---------- The Depths (past floor 100): loose boulders and crevasses, survived with trivia
 const HAZARD={
-  boulder:{title:"A boulder blocks the way",text:"Loose rock has buried the way in. Moving it will cost you some strength either way. Answer correctly to shift it carefully. Answer wrong and it rolls back onto you.",ok:.05,bad:.25,killer:"a falling boulder",okLine:"You heave the boulder aside. Your arms ache.",badLine:"The boulder slips and pins you."},
-  crevasse:{title:"The ground splits open",text:"A crevasse tears open in front of you. Answer correctly to leap across. Answer wrong and you fall in, climbing out battered.",ok:0,bad:.2,killer:"a crevasse",okLine:"You leap the crevasse and land clean.",badLine:"You fall into the crevasse and claw your way back out."}
+  boulder:{title:"A boulder blocks the way",short:"Answer right to shift it carefully. Miss and it rolls onto you.",text:"Loose rock has buried the way in. Moving it will cost you some strength either way. Answer correctly to shift it carefully. Answer wrong and it rolls back onto you.",ok:.05,bad:.25,killer:"a falling boulder",okLine:"You heave the boulder aside. Your arms ache.",badLine:"The boulder slips and pins you."},
+  crevasse:{title:"The ground splits open",short:"Answer right to leap across. Miss and you fall in.",text:"A crevasse tears open in front of you. Answer correctly to leap across. Answer wrong and you fall in, climbing out battered.",ok:0,bad:.2,killer:"a crevasse",okLine:"You leap the crevasse and land clean.",badLine:"You fall into the crevasse and claw your way back out."}
 };
 const depths=()=>S.floor>GOAL;
 function startHazard(i,kind){S.hzDoor=i;S.hz=kind;S.screen="hazard";S.q=getQuestion(pick(available()),"h");S.phase="ask";S.tMax=BASE_TIME+6*cnt("owl");S.tLeft=S.tMax;render();startTimer()}
@@ -1129,6 +1135,7 @@ function answer(opt){
     if(S.q.cat===e.weak){dmg*=2+.5*cnt("lens");notes.push("craved")}
     else if(S.q.cat===e.resist){dmg*=.5;notes.push("bored")}
     if(S.blessings&&S.blessings.includes(S.q.cat)){dmg*=2;notes.push("mentored")}
+    const stm=e.studyMult&&e.studyMult[S.q.cat];if(stm){dmg*=stm;notes.push(`studied ×${stm}`)}
     if(elapsed<=6+4*cnt("ember")){dmg*=1.5;notes.push("critical")}
     if(S.streak>=3){dmg+=3;notes.push(`streak ${S.streak}`)}
     dmg=Math.round(dmg);e.hp=Math.max(0,e.hp-dmg);
@@ -1236,7 +1243,7 @@ function strip(nav,info){return `<footer class="info${logBig?" big":""}"><div cl
 const LOGN=40;
 function footerView(){
   let pin="",nav="";const off=t=>`<button class="btn" disabled>${t}</button>`;
-  if(S.screen==="battle"&&S.phase==="choose"&&S.enemy&&S.enemy.boss)nav=`<button class="btn" data-a="cat" data-c="${esc(S.offer[0])}" id="nextbtn">Ready</button>${S.enemy.studied?"":`<button class="btn ghost" data-a="study">Study first</button>`}`;
+  if(S.screen==="battle"&&S.phase==="choose"&&S.enemy&&S.enemy.boss)nav=`<button class="btn" data-a="cat" data-c="${esc(S.offer[0])}" id="nextbtn">Ready</button>${(Array.isArray(S.enemy.studied)?S.enemy.studied:[]).includes(S.offer[0])?"":`<button class="btn ghost" data-a="study">Study</button>`}`;
   else if(S.screen==="battle"){nav=S.phase==="result"?`<button class="btn" data-a="next" id="nextbtn">${S.hp<=0?"Fall":S.enemy.hp<=0?"Claim victory":"Continue"}</button>`:off("Continue")}
   else if(S.screen==="hazard"){nav=S.phase==="result"?`<button class="btn" data-a="hznext" id="nextbtn">${S.hp<=0?"Fall":"Press on"}</button>`:off("Press on")}
   else if(S.screen==="lesson"){
@@ -1262,13 +1269,16 @@ function footerView(){
 // Title page bottom strip: resume or start fresh, with the last run's details in the log area
 function titleFooter(){
   const d=readSave(),last=loadRuns()[0];let nav="",info="";
+  if(maxSlots()>1){const used=[1,2,3].filter(n=>readSave(n)).length;
+    nav=d?`<button class="btn" data-a="continue">Resume run ${SLOT}</button><button class="btn ghost" data-a="tsheet" data-v="slots">All runs (${used}/3)</button>`:`<button class="btn" data-a="tsheet" data-v="slots">Your runs (${used}/3)</button>`}
+  else
   if(!d)nav=`<button class="btn" data-a="start">Go to base camp</button>`;
   else if(confirmNew){
     if(d.inside){info=`<p class="pin"><strong>Start at a new base camp?</strong> Your descent ends at floor ${d.floor} and its progress is lost.</p>`;nav=`<button class="btn" data-a="leaveok">Start new</button><button class="btn ghost" data-a="newno">Keep my run</button>`}
     else{info=`<p class="pin"><strong>Start at a new base camp?</strong> Your gold, mentors and lessons will be lost.</p>`;nav=`<button class="btn" data-a="newok">Start new</button><button class="btn ghost" data-a="newno">Keep my camp</button>`}}
-  else nav=`<button class="btn" data-a="continue">Resume last run</button><button class="btn ghost" data-a="newgame">New base camp</button>`;
+  else if(maxSlots()===1)nav=`<button class="btn" data-a="continue">Resume last run</button><button class="btn ghost" data-a="newgame">New base camp</button>`;
   if(d&&!confirmNew){const when=new Date(d.savedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-    info+=`<p><strong>Last run:</strong> ${d.inside?`floor ${d.floor} of the Conungeon`:"at base camp"} · saved ${esc(when)}</p><p class="muted">Health ${d.hp} / ${d.maxHp} · Power ${d.power} · ${d.relics.length} relic${d.relics.length===1?"":"s"}${d.blessings&&d.blessings.length?` · ${d.blessings.length} mentor${d.blessings.length>1?"s":""}`:""}${d.inside?"":` · ${d.gold} gold`}</p>`}
+    info+=`<p><strong>${maxSlots()>1?`Run ${SLOT}:`:"Last run:"}</strong> ${d.inside?`floor ${d.floor} of the Conungeon`:"at base camp"} · saved ${esc(when)}</p><p class="muted">Health ${d.hp} / ${d.maxHp} · Power ${d.power} · ${d.relics.length} relic${d.relics.length===1?"":"s"}${d.blessings&&d.blessings.length?` · ${d.blessings.length} mentor${d.blessings.length>1?"s":""}`:""}${d.inside?"":` · ${d.gold} gold`}</p>`}
   if(last)info+=`<p class="muted">Last descent, ${last.date}: ${last.won?"beat the Super Computaur":`reached floor ${last.floor}`} · ${last.acc}% right · best streak ${last.streak}</p>`;
   const best=loadBest();if(best)info+=`<p class="muted">Deepest floor ever: ${best}</p>`;
   if(!info)info=`<p class="muted">Your runs will be recorded here.</p>`;
@@ -1276,14 +1286,21 @@ function titleFooter(){
 }
 function floorList(log){return `<ol class="floors">${log.map(x=>`<li class="${x.good?"good":x.end?"end":""}"><span class="num">${x.f}</span><span>${esc(x.t)}</span></li>`).join("")}</ol>`}
 // ---------- Saving: campsites (base camp and every campfire) save your descent in this browser
-const SAVE_KEY="conungeon-save";
+// Save slots: everyone gets one run; Möbius ring holders can keep up to three runs going at once.
+const saveKey=n=>n===1?"conungeon-save":"conungeon-save-"+n;
+let SLOT=(()=>{try{return +localStorage.getItem("conungeon-slot")||1}catch(e){return 1}})();
+const hasRing=()=>{try{return !!localStorage.getItem("conungeon-trophy")}catch(e){return false}};
+const maxSlots=()=>hasRing()?3:1;
+function useSlot(n){SLOT=n;try{localStorage.setItem("conungeon-slot",n)}catch(e){}}
+if(SLOT>maxSlots())SLOT=1;
+let confirmDel=0;
 let confirmNew=false, storyOpen=false;
 function saveGame(label){
   if(!S)return;if(S.inside&&S.screen==="camp")return;if(["dead","win"].includes(S.screen))return;
   const inside=S.inside&&S.screen!=="lesson";
   const where=label||(inside?(S.screen==="rest"?`Healing stone, floor ${S.floor}`:`Floor ${S.floor}${S.phase==="ask"?" · mid-question":""}`):"Base camp");
   const keep=inside?{}:{q:null,lesson:null,enemy:null,offer:null,phase:null,picked:null};
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({...S,...keep,showList:false,showCamps:false,managePack:false,confirmDescend:false,hitMe:false,hitFoe:false,
+  try{localStorage.setItem(saveKey(SLOT),JSON.stringify({...S,...keep,showList:false,showCamps:false,managePack:false,confirmDescend:false,hitMe:false,hitFoe:false,
     screen:S.screen==="lesson"?"camp":S.screen,log:S.log.slice(0,40),savedAt:Date.now(),savedWhere:where}))}catch(e){}
 }
 // Saves from before the new question bank may name subjects that no longer exist.
@@ -1296,8 +1313,8 @@ function fixSubjects(){fixPower();const ren=c=>c==="Sports"?"Sports & Games":c,o
   if(S.offer)S.offer=S.offer.map(c=>ok(c)?c:pick(CATS));
   if(S.enemy){if(!ok(S.enemy.weak))S.enemy.weak=pick(CATS);if(!ok(S.enemy.resist)||S.enemy.resist===S.enemy.weak)S.enemy.resist=pick(CATS.filter(c=>c!==S.enemy.weak))}
   if(S.q&&!ok(S.q.cat))S.q.cat=pick(CATS);}
-function readSave(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY)||"null");return d&&d.screen?d:null}catch(e){return null}}
-function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
+function readSave(n){try{const d=JSON.parse(localStorage.getItem(saveKey(n||SLOT))||"null");return d&&d.screen?d:null}catch(e){return null}}
+function clearSave(n){try{localStorage.removeItem(saveKey(n||SLOT))}catch(e){}}
 function abandonDescent(){const d=readSave();if(d&&d.inside){S=d;recordRun(false,true);if(S.floor>loadBest())saveBest(S.floor)}S=null;clearSave();newRun()}
 function resumeGame(){const d=readSave();if(!d)return;stopTimer();S=d;S.best=loadBest();fixSubjects();
   const mid=S.phase==="ask"&&["battle","hazard"].includes(S.screen);
@@ -1429,7 +1446,7 @@ function render(){
   }else if(S.screen==="hazard"){
     const H=HAZARD[S.hz],q=S.q,done=S.phase==="result";
     body=`<section class="room"><div class="teacher"><canvas class="cave small" width="64" height="44" data-type="${S.hz}" data-seed="${S.floor}" aria-hidden="true"></canvas><div style="min-width:0"><p class="label">Floor ${S.floor} · the Depths</p><h2>${esc(H.title)}</h2></div></div>
-      ${done?"":`<p class="muted hzt">${esc(H.text)}</p>`}
+      <p class="muted hzt">${esc(H.short||H.text)}</p>
       <div class="meta"><span class="label">${esc(q.cat)} · hard · ${S.hz==="boulder"?`−${Math.ceil(S.maxHp*H.ok)} HP if right, −${Math.ceil(S.maxHp*H.bad)} if wrong`:`−${Math.ceil(S.maxHp*H.bad)} HP if wrong`}</span><span class="label num" id="tnum">${done?"":Math.ceil(S.tLeft)+"s"}</span></div>
       <div class="timer${done?" off":""}"><i id="tbar" style="width:${S.tLeft/S.tMax*100}%"></i></div>
       <p class="q">${esc(q.text)}</p>
@@ -1444,12 +1461,12 @@ function render(){
     const e=S.enemy;
     let mid="";
     if(S.phase==="choose"){
-      const mOf=c=>{const w=c===e.weak,r=c===e.resist,b=S.blessings.includes(c),m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1);const tags=[w?"craved":r?"bored":"",b?"mentored":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")};
-      if(e.boss)mid=`<p class="label">The boss picks the subject</p><div class="cats one"><div class="cat bosspick ${S.offer[0]===e.weak?"w":S.offer[0]===e.resist?"r":""}"><strong>${S.offer[0]}</strong><span class="m">${mOf(S.offer[0])} · hard question</span></div></div><p class="muted small">Tap Ready when you are; the clock starts then.${e.studied?"":" Or study first: one calm study session in this subject, once per boss, healing as you go."}</p>`;
+      const mOf=c=>{const w=c===e.weak,r=c===e.resist,b=S.blessings.includes(c),st=(e.studyMult&&e.studyMult[c])||1,m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1)*st;const tags=[w?"craved":r?"bored":"",b?"mentored":"",st>1?"studied":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")};
+      if(e.boss)mid=`<p class="label">The boss picks the subject</p><div class="cats one"><button class="cat bosspick ${S.offer[0]===e.weak?"w":S.offer[0]===e.resist?"r":""}" data-a="cat" data-c="${esc(S.offer[0])}"><strong>${S.offer[0]}</strong><span class="m">${mOf(S.offer[0])} · hard question · tap to start</span></button></div><p class="muted small">Tap the subject or Ready when you are; the clock starts then. ${(Array.isArray(e.studied)?e.studied:[]).includes(S.offer[0])?" You've already studied this subject for this boss.":" Or study it first (once per subject): five calm questions with no clock, healing as you go. Studying makes right answers in this subject fill the boss's bar ×1.5, or ×2 with a perfect five."}</p>`;
       else mid=`<p class="label">${e.elite?"Rowdy table: pick one of two subjects":"Pick a subject"}</p><div class="cats${e.elite?" two":""}">${S.offer.map(c=>{const w=c===e.weak,r=c===e.resist;return `<button class="cat ${w?"w":r?"r":""}" data-a="cat" data-c="${c}"><strong>${c}</strong><span class="m">${(()=>{const b=S.blessings.includes(c),m=(w?2+.5*cnt("lens"):r?.5:1)*(b?2:1);const tags=[w?"craved":r?"bored":"",b?"mentored":""].filter(Boolean).join(" + ");return "×"+m+(tags?" · "+tags:"")})()}</span></button>`}).join("")}</div>`;
     }else{
       const q=S.q, done=S.phase==="result";
-      const mm=(q.cat===e.weak?2+.5*cnt("lens"):q.cat===e.resist?.5:1)*(S.blessings.includes(q.cat)?2:1),mtag=[q.cat===e.weak?"craved":q.cat===e.resist?"bored":"",S.blessings.includes(q.cat)?"mentored":""].filter(Boolean).join(" + ");
+      const st=(e.studyMult&&e.studyMult[q.cat])||1,mm=(q.cat===e.weak?2+.5*cnt("lens"):q.cat===e.resist?.5:1)*(S.blessings.includes(q.cat)?2:1)*st,mtag=[q.cat===e.weak?"craved":q.cat===e.resist?"bored":"",S.blessings.includes(q.cat)?"mentored":"",st>1?"studied":""].filter(Boolean).join(" + ");
       mid=`<div class="meta"><span class="label">${q.cat} · ${{e:"easy",m:"medium",h:"hard"}[q.d]} · <span class="${q.cat===e.weak?"good":q.cat===e.resist?"bad":""}">×${mm}${mtag?" "+mtag:""}</span></span>${!done&&has("table")&&!q.lean&&(e.tableUsed||0)<cnt("table")?`<button class="linkbtn" data-a="table">Ask table (${cnt("table")-(e.tableUsed||0)})</button>`:""}<span class="label num" id="tnum">${done?"":Math.ceil(S.tLeft)+"s"}</span></div>
         <div class="timer${done?" off":""}"><i id="tbar" style="width:${S.tLeft/S.tMax*100}%"></i></div>
         <p class="q">${esc(q.text)}</p>
@@ -1802,16 +1819,20 @@ function buryDoor(cv){
 }
 function drawDoors(t){if(!document.querySelectorAll)return;document.querySelectorAll("canvas.cave").forEach(cv=>{drawCave(cv,t);if(cv.dataset.buried)buryDoor(cv)})}
 const STORY_P=["One morning, strange portals tore open in the ground all over the world. Each one led down a deep, dark staircase, with a low rumble and hungry eyes glaring up from below.", "It took months for the world to agree on a plan, a new world record for agreeing on anything. Finally, a brave soul from every country stepped inside.", "They found monsters of every shape and size, all with an endless, terrible thirst for… knowledge?", "It turns out the portals lead to an interdimensional trivia bar. Twisting passages wind from den to den, where visitors from across the multiverse gather for trivia night. This season, for the very first time, the theme is Earth. Can you guess the bar's name? That's right: <b>the Conungeon</b>, the Dungeon of Conundrums.", "Why do they look so menacing? No idea. They don't judge your face, so don't judge theirs.", "They <i>do</i> judge your answers, though. Life is busy across a dozen dimensions, and trivia night is the one night they get with their friends. So when an actual Earthling sits down and doesn't know things about their own planet, it kind of harshes the vibe. <i>\"Oh, come ON. Do you even live on the surface?!\"</i>", "Answer well and they'll share gifts from beyond. Anger them too much and they'll knock you out cold and send you back up to the surface. On floor 100, the bar's Quizmaster, the Super Computaur, hosts the final round.", "Now curious minds from all over the world gather at the portal's mouth, trading notes and working up their courage. How deep will you dare to go?"];
-const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study nooks.</b> Sometimes a study nook opens beside the healing stone and reliquary: five calm questions with no clock, healing as you answer. Get all five right and that subject's scholar becomes your mentor. Before a boss's question, you can also study its subject once.</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's own knowledge bar: 15% on the first floors, rising to 95% by floor 100. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
+const RULES_HTML="<li><b>Prepare at base camp.</b> Scholars teach five questions at a time. Get all five right and they become your mentor: ×2 knowledge with their subject. Already have three? You can swap one, and they'll cheer you on. Spend the gold you earn at the merchant.</li>\n        <li><b>No turning back.</b> Once you step through the portal, you stay until you're knocked out. Every floor saves automatically, even mid-question, so you can close the game and pick up right where you left off.</li>\n        <li><b>Fill each visitor's knowledge bar.</b> Visitors offer three subjects each turn, rowdy tables two, and bosses pick the subject for you. Each right answer fills the bar by your Power, which grows by 1 every floor, and subjects a visitor craves fill it twice as fast. Answer within 6 seconds for a critical answer. Three right in a row adds a streak bonus.</li>\n        <li><b>Study before a boss question.</b> When a boss picks a subject, you can study it first, once per subject per boss: five calm questions with no clock, healing as you answer. Studying makes your right answers in that subject fill the boss's bar ×1.5 for the rest of the fight, or ×2 with a perfect five. A perfect five also makes that subject's scholar your mentor (or offers a swap).</li>\n        <li><b>Wrong answers make visitors angry,</b> and angry visitors hit. A hit costs a share of the visitor's own knowledge bar: 15% on the first floors, rising to 95% by floor 100. Lose all your health and they knock you out. The first time, the visitors enjoy your company too much to let you go: you rejoin on the same floor with 30% of your health. The second time, you're sent back to the surface.</li>\n        <li><b>Visitors share gifts.</b> Right answers sometimes earn an item, and after a rough patch, your next right answer always brings a potion. Fill a visitor's bar to choose a gift and gain max HP based on how thirsty for knowledge they were.</li>\n        <li><b>Bosses lurk at random.</b> They ask only hard questions. When the walls start to tremble, one is close. Sometimes a boss's lair appears as a passage you can take early for a bonus relic. Beating a boss fully heals you.</li>\n        <li><b>Choose your passage wisely.</b> Visitor passages take you one floor deeper. A healing stone and a reliquary sometimes appear together as side rooms: pick one, stay on the same floor, and still gain +1 Power. The pair won't return until you've satisfied another visitor.</li>\n        <li><b>Relics and items.</b> Reliquaries offer two relics and an item. Relics work automatically. Items go in an 4-slot pack, and copies stack up to 10 in a slot. When you're in danger, items that can help start to glow.</li>";
 let titleSheet=null;
 // Analytics Conungeon: a passcode-gated link (remembered on this device once entered)
 const ANA_URL="analytics.html",ANA_CODE="1234";
 const anaOpen=()=>{try{return localStorage.getItem("ana-unlocked")==="1"}catch(e){return false}};
 document.addEventListener("submit",ev=>{if(!ev.target.classList||!ev.target.classList.contains("lockform"))return;ev.preventDefault();
   const i=$("#pass"),m=$("#passmsg");if(i&&i.value===ANA_CODE){try{localStorage.setItem("ana-unlocked","1")}catch(e){}location.href=ANA_URL}else if(m){m.textContent="That's not it. Try again.";i.value="";i.focus()}});
+function slotList(){return `<ul class="rlist slots">${[1,2,3].map(n=>{const d=readSave(n);
+  if(!d)return `<li>${ico("trivial")}<div><strong>Run ${n} · empty</strong><span class="muted">Start a fresh run at base camp.</span></div><button class="btn" data-a="slotnew" data-v="${n}">Start</button></li>`;
+  const when=new Date(d.savedAt).toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  return `<li>${ico(d.inside?"heart":"gold")}<div><strong>Run ${n}${n===SLOT?" · current":""}</strong><span class="muted">${d.inside?`Floor ${d.floor}`:"Base camp"} · HP ${d.hp}/${d.maxHp} · Power ${d.power} · saved ${esc(when)}</span>${confirmDel===n?`<span class="bad small">Abandon this run? Its progress is lost.</span>`:""}</div><span class="slotbtns"><button class="btn" data-a="slotplay" data-v="${n}">Play</button>${confirmDel===n?`<button class="btn ghost" data-a="slotdelok" data-v="${n}">Abandon</button>`:`<button class="linkbtn" data-a="slotdel" data-v="${n}">Abandon</button>`}</span></li>`}).join("")}</ul>`}
 function titleSheetView(){
   if(!titleSheet)return "";
-  const body=titleSheet==="lock"?`<h2>Analytics Conungeon</h2><p class="muted">Enter the passcode to go in.</p><form class="lockform" autocomplete="off"><input id="pass" type="password" inputmode="numeric" maxlength="8" aria-label="Passcode" autofocus><button class="btn" type="submit">Enter</button></form><p class="bad" id="passmsg" aria-live="polite"></p>`:titleSheet==="story"?`<h2>The story continues…</h2><div class="lorebody">${STORY_P.slice(3).map(x=>`<p>${x}</p>`).join("")}</div>`:titleSheet==="rules"?`<h2>How to play</h2><ul class="rules">${RULES_HTML}</ul>`:`<h2>Past descents</h2>${pastRuns()}`;
+  const body=titleSheet==="slots"?`<h2>Your runs</h2><p class="muted small">Your Möbius ring lets you keep up to three runs going. Each keeps its own floor, health, relics and mentors.</p>${slotList()}`:titleSheet==="lock"?`<h2>Analytics Conungeon</h2><p class="muted">Enter the passcode to go in.</p><form class="lockform" autocomplete="off"><input id="pass" type="password" inputmode="numeric" maxlength="8" aria-label="Passcode" autofocus><button class="btn" type="submit">Enter</button></form><p class="bad" id="passmsg" aria-live="polite"></p>`:titleSheet==="story"?`<h2>The story continues…</h2><div class="lorebody">${STORY_P.slice(3).map(x=>`<p>${x}</p>`).join("")}</div>`:titleSheet==="rules"?`<h2>How to play</h2><ul class="rules">${RULES_HTML}</ul>`:`<h2>Past descents</h2>${pastRuns()}`;
   return `<div class="overlay" role="dialog"><div class="sheet">${body.replace(/^<h2>(.*?)<\/h2>/,(m,t)=>`<div class="sheethead"><h2>${t}</h2><button class="linkbtn closex" data-a="tsheet" data-v="" aria-label="Close">✕ Close</button></div>`)}</div></div>`;
 }
 function titleView(){
@@ -1830,6 +1851,10 @@ document.addEventListener("click",ev=>{
   const a=b.dataset.a,i=+b.dataset.i;
   if(a==="start")newRun();
   else if(a==="continue")resumeGame();
+  else if(a==="slotplay"){useSlot(+b.dataset.v);titleSheet=null;confirmDel=0;resumeGame()}
+  else if(a==="slotnew"){useSlot(+b.dataset.v);titleSheet=null;confirmDel=0;newRun()}
+  else if(a==="slotdel"){confirmDel=+b.dataset.v;render()}
+  else if(a==="slotdelok"){const n=+b.dataset.v,cur=SLOT;useSlot(n);const d=readSave(n);if(d&&d.inside){const keep=S;S=d;recordRun(false,true);S=keep}clearSave(n);useSlot(cur);confirmDel=0;render()}
   else if(a==="table")askTable();
   else if(a==="logsize"){logBig=!logBig;render()}
   else if(a==="tsheet"){titleSheet=b.dataset.v||null;render()}
