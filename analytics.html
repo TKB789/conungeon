@@ -719,6 +719,26 @@ footer.info .tipline{font-size:14px;line-height:1.35}
   box-shadow:0 -3px 0 0 #56604f,0 3px 0 0 #56604f,-3px 0 0 0 #56604f,3px 0 0 0 #56604f}
 .lockform input:focus{outline:none;box-shadow:0 -3px 0 0 var(--torch),0 3px 0 0 var(--torch),-3px 0 0 0 var(--torch),3px 0 0 0 var(--torch)}
 .door{transition:none}
+#app.run .cats.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+#app.run .cats.one{grid-template-columns:1fr;max-height:120px}
+.cat.bosspick{--f:var(--torch)}
+.cat.bosspick strong{font-size:22px}
+.small{font-size:14.5px;line-height:1.35}
+.swapbox{margin-top:8px;padding:8px 10px;background:#141815;--f:var(--torch);box-shadow:0 -3px 0 0 var(--f),0 3px 0 0 var(--f),-3px 0 0 0 var(--f),3px 0 0 0 var(--f)}
+.swaprow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.swaprow .btn{padding:6px 10px;font-size:15px;margin:4px}
+.swaprow small{color:var(--dim);font-size:13px}
+#app.run .doors.n4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:6px 3px}
+#app.run .doors.n4 .door{padding:6px 4px 10px;gap:4px}
+#app.run .doors.n4 .door strong{font-size:16px}
+#app.run .doors.n4 .door small{font-size:12px}
+#app.run .doors.n4 .cave{max-width:52%}
+#app.run .doors.n4 .door small{line-height:1.15}
+#app.run .hzt{height:2.7em;overflow:hidden;font-size:15px;line-height:1.35;margin:0}
+.slots li{align-items:center}
+.slots li>div{flex:1;min-width:0}
+.slotbtns{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.slots .btn{padding:6px 12px;font-size:15px;margin:4px}
 
 /* ---------- Analytics Conungeon additions */
 :root{--ink:#ebe1c8;--ink-2:#a39c88;--card:#141815;--pen:#e3a548;--muted-bg:#1d1a12;--line:#3d463f;--serif:"Alegreya Sans",Georgia,serif;--sans:"Alegreya Sans",system-ui,sans-serif;--ok:#6cbcae;--bad:#cf5444;--warn:#e3a548;--hl:#3a3216;--hl-ink:#ffe08a;--paper:#141815;--grid:#2d342f;--ok-bg:#13231f;--bad-bg:#2a1210;--warn-bg:#2a2210}
@@ -899,6 +919,13 @@ function drawCave(cv,t){
     P(cx-6,FY-1,12,1,"#2c2f40");
     const rc=p>.5?"#c8fff0":"#5ef0c8";P(cx-1,FY-12,3,1,rc);P(cx,FY-11,1,6,rc);P(cx-2,FY-9,1,2,rc);P(cx+2,FY-9,1,2,rc);P(cx-1,FY-6,3,1,rc);
     if(!still){const k=(t/300+seed)%8;if(k<1)P(cx-7,FY-10,1,1,"#c8fff0");else if(k<2)P(cx+6,FY-13,1,1,"#c8fff0");else if(k<3)P(cx+5,FY-5,1,1,"#c8fff0")}
+  }else if(type==="nook"){
+    // a lamp on a little desk with an open book
+    const p=still?.5:(Math.sin(t/500+seed)+1)/2;
+    glow(cx+3,FY-11,9+(p>.5?1:0),"#ffcf6a",.14+.12*p,true);
+    P(cx-8,FY-5,16,2,"#6b4020");P(cx-7,FY-3,1,3,"#4a2c16");P(cx+6,FY-3,1,3,"#4a2c16");
+    P(cx-6,FY-7,5,2,"#efe8d6");P(cx-1,FY-7,5,2,"#e2d8bf");P(cx-1,FY-7,1,2,"#9a9283");
+    P(cx+4,FY-13,1,6,"#3c2516");P(cx+2,FY-15,5,2,"#8a5a1a");P(cx+3,FY-13,3,1,p>.5?"#fff2b0":"#ffd25a");
   }else if(type==="treasure"){
     glow(cx,FY-4,10,"#ffd25a",.16,true);
     P(cx-6,FY-6,12,6,"#78502f");P(cx-6,FY-8,12,2,"#5a3a24");P(cx-6,FY-6,12,1,"#3c2516");
@@ -918,8 +945,8 @@ function drawCave(cv,t){
 // Data: MQ (questions), SCN (scenarios), SHORT (module names) are injected above this script.
 const SAVE="ana-conungeon";
 const still=matchMedia("(prefers-reduced-motion: reduce)").matches;
-const BASE_T=90, READ_T=60, WATCH_T=45, CARRY_MAX=300;   // seconds: per question, extra reading time on a scenario's first part, pocket watch top-up, cap on carried time
-const MAX_HP=40, DROP=.15, POTION_MAX=5;
+const BASE_T=90, READ_T=60, CARRY_MAX=300;   // seconds: per question, reading time on a scenario's first part, cap on carried time. Nothing adds extra time: like a real exam.
+const MAX_HP=40, POTION_MAX=5, SIDE_CHANCE=.5, STONE_HEAL=.4;
 const HEAL_RIGHT=.05, SECOND_WIND=.2, POTION=.35;   // heals, as shares of max HP
 const pct=f=>Math.max(1,Math.round(S.maxHp*f));
 const rightHeal=()=>pct(HEAL_RIGHT+.01*cnt("ember")), windHeal=()=>pct(SECOND_WIND+.1*cnt("ink"));
@@ -931,8 +958,7 @@ const VIS={
 // Loot visitors leave behind: relics work automatically and stack up to their max
 const LOOT=[
  {id:"plate",n:"Iron Plate",d:"Wrong answers hit you for 1 less.",max:4},
- {id:"owl",n:"Owl Feather",d:"+15 seconds on every question.",max:4},
- {id:"tome",n:"Thick Tome",d:"+15% max HP, and heal that much now.",max:5},
+ {id:"tome",n:"Thick Tome",d:"+15% max HP, and heal that much now. No limit, but after 5 tomes each adds +5%.",max:Infinity},
  {id:"ember",n:"Warm Ember",d:"Right answers heal 1% of your max HP more.",max:3},
  {id:"table",n:"Study Group",d:"Once per visitor, tap Hint to cross out one wrong choice. Each copy adds a hint.",max:3},
  {id:"ink",n:"Vampiric Ink",d:"Three in a row heals 10% of your max HP more.",max:3},
@@ -953,7 +979,7 @@ const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const L="ABCDEFGHIJKL";
 
-function fresh(){return fix({mastered:{},misses:{},hp:MAX_HP,maxHp:MAX_HP,revives:0,asked:0,correct:0,streak:0,bestStreak:0,visits:0,screen:"map",log:["You've earned your expert badge: the heart pendant and pocket watch are yours, and you use every item without thinking. No merchants, no scholars. Just you and the questions."]})}
+function fresh(){return fix({mastered:{},misses:{},hp:MAX_HP,maxHp:MAX_HP,revives:0,asked:0,correct:0,streak:0,bestStreak:0,visits:0,screen:"map",log:["You've earned your expert badge: the heart pendant is yours, and you use every item without thinking. No merchants, no scholars, and no extra time: just you, the questions and a real exam clock."]})}
 // Question-bank updates: questions whose wording or answer changed lose their mastery once
 const DATA_VER=2, CHANGED={2:["x-m10-12","x-m10-16","x-m10-28","x-m10-17"]};
 function fix(d){if(d.mastered&&(d.dataVer||1)<DATA_VER){for(let v=(d.dataVer||1)+1;v<=DATA_VER;v++)(CHANGED[v]||[]).forEach(id=>{delete d.mastered[id]});d.offer=null;d.dataVer=DATA_VER}d.relics=d.relics||[];d.potions=d.potions||0;d.offer=d.offer||null;d.gone=d.gone||[];d.sel=d.sel||[];d.picked=d.picked||[];d.log=d.log||[];d.endless=d.endless||null;d.started=d.started||Date.now();
@@ -1008,7 +1034,7 @@ function ask(){
   S.order=q.fixed?q.opts.map((_,i)=>i):shuffle(q.opts.map((_,i)=>i));
   S.sel=[];S.picked=[];S.gone=[];S.phase="ask";S.watch=false;
   const carry=same?Math.min(CARRY_MAX,S.carry||0):0;
-  S.base=(same?BASE_T:BASE_T+READ_T)+15*cnt("owl");S.carryIn=carry;S.tMax=S.base+carry;S.tLeft=S.tMax;
+  S.base=same?BASE_T:BASE_T+READ_T;S.carryIn=carry;S.tMax=S.base+carry;S.tLeft=S.tMax;
   // the scenario stays open for every related part; it only stays hidden if you hid it during this scenario
   S.scnOpen=same?S.scnOpen!==false:true;
   if(carry)say(`<span class="good">+${Math.round(carry)}s</span> carried over from the last part of this scenario.`);
@@ -1020,7 +1046,6 @@ function startTimer(){stopTimer();let last=Date.now(),n=0;timerId=setInterval(()
   if(sheet)return; // paused while a sheet is open
   S.tLeft=Math.max(0,S.tLeft-dt);
   if(S.tLeft<=0){
-    if(!S.watch){S.watch=true;S.tLeft+=WATCH_T;S.tMax=Math.max(S.tMax,S.tLeft);say(`${ico("pocket","ico sm")} Your pocket watch winds back <span class="good">${WATCH_T}s</span>.`);render();return}
     stopTimer();grade(true);return}
   const b=$("#tbar"),t=$("#tnum");if(b)b.style.width=(S.tLeft/S.tMax*100)+"%";if(t)t.textContent=Math.ceil(S.tLeft)+"s";
   if(++n%10===0)save();
@@ -1047,7 +1072,6 @@ function grade(timeout){
     const h=heal(rightHeal());
     say(`<span class="good">Right.</span> "${pick(CHEERS)}"${h?` +${h} HP.`:""}${S.carry>0?` ${Math.round(S.carry)}s saved for the next part.`:""}`);
     if(S.streak%3===0){const w=heal(windHeal());if(w)say(`Three in a row: a second wind. +${w} HP.`)}
-    if(Math.random()<DROP&&S.potions<POTION_MAX){S.potions++;say(`${ico("potion","ico sm")} ${n} drops a potion. You pocket it (${S.potions} in your pack).`)}
   }else{
     S.streak=0;if(!V.endless)delete S.mastered[q.id];S.misses[q.id]=(S.misses[q.id]||0)+1;V.missed.push(q.id);S.carry=0;
     const dmg=hitOf(V.k);S.hp-=dmg;S.hitMe=true;
@@ -1069,17 +1093,21 @@ function finishVisit(){
   let grow=0;for(let j=0;j<V.gained;j++){const d=Math.max(1,Math.round(S.maxHp*.01));S.maxHp+=d;grow+=d}V.grow=grow;
   if(V.endless)S.endless.visits++;
   const h=heal(Math.ceil(S.maxHp*.5));
-  if(!S.endless&&allDone()){S.endless={visits:0,right:0,since:Date.now()};S.hp=S.maxHp;say(`<span class="good">Every section is mastered!</span> The whole bar goes quiet. Now the endless challenge begins: random visitors, random questions, and harder hits as you go. Revives are over; fall now and your run ends.`)}
-  say(`${V.missed.length?`${n} leaves, muttering about ${V.missed.length} answer${V.missed.length===1?"":"s"}. They'll be back.`:`${n} is satisfied${secDone(V.k)?" and tips their hat. Section mastered!":"."}`}${grow?` +${grow} max HP for what you mastered.`:""} Resting heals ${h} HP.`);
-  // loot: pick one of three
-  const pool=shuffle(LOOT.filter(l=>l.item?S.potions<POTION_MAX:cnt(l.id)<l.max));
-  V.loot=pool.slice(0,3).map(l=>l.id);V.took=null;
+  if(!S.endless&&allDone()){S.endless={visits:0,right:0,since:Date.now()};S.hp=S.maxHp;say(`<span class="good">Every round is mastered!</span> The whole bar goes quiet. Now the endless challenge begins: random visitors, random questions, and harder hits as you go. Revives are over; fall now and your run ends.`)}
+  say(`${V.missed.length?`${n} leaves, muttering about ${V.missed.length} answer${V.missed.length===1?"":"s"}. They'll be back.`:`${n} is satisfied${secDone(V.k)?" and tips their hat. Round mastered!":"."}`}${grow?` +${grow} max HP for what you mastered.`:""} Resting heals ${h} HP.`);
+  // Like the Trivia Conungeon: after a visit, a healing stone and a reliquary sometimes open up as side rooms.
+  // Pick one; the pair won't return until you've finished another visit.
+  S.side=Math.random()<SIDE_CHANCE;
   save();render(true);
 }
-function takeLoot(id){const V=S.visit;if(V.took)return;const l=LOOT.find(x=>x.id===id);V.took=id;
+function openSide(t){if(!S.side)return;
+  if(t==="rest"){S.side=false;const h=heal(Math.ceil(S.maxHp*STONE_HEAL));say(`The healing stone hums. You recover ${h} HP.`);save();render(true);return}
+  const relics=shuffle(LOOT.filter(l=>!l.item&&cnt(l.id)<l.max)).slice(0,2),items=LOOT.filter(l=>l.item&&S.potions<POTION_MAX);
+  S.reliq=relics.concat(items).slice(0,3).map(l=>l.id);S.screen="reliq";render(true)}
+function takeLoot(id){if(S.screen!=="reliq")return;const l=LOOT.find(x=>x.id===id);S.side=false;S.reliq=null;S.screen="map";
   if(l.item){S.potions=Math.min(POTION_MAX,S.potions+2);say(`${ico("potion","ico sm")} You take two potions (${S.potions} in your pack).`)}
-  else{S.relics.push(id);if(id==="tome"){const g=pct(.15);S.maxHp+=g;heal(g)}say(`${ico(id,"ico sm")} You take the ${l.n}${cnt(id)>1?` (×${cnt(id)})`:""}. ${l.d}`)}
-  save();render()}
+  else{S.relics.push(id);if(id==="tome"){const g=pct(cnt("tome")<=5?.15:.05);S.maxHp+=g;heal(g)}say(`${ico(id,"ico sm")} You take the ${l.n}${cnt(id)>1?` (×${cnt(id)})`:""}. ${l.d}`)}
+  save();render(true)}
 function revive(){S.revives++;S.hp=S.maxHp;S.screen="battle";S.visit.pendant=true;say(`You come to on the floor. A kind bartender helps you up: revive #${S.revives}, full health. The visitor is still waiting.`);nextQ()}
 
 // ---------- views
@@ -1094,17 +1122,19 @@ function hud(){
 }
 function doorCard(k){
   const i=SECS.indexOf(k),[n,g]=VIS[k],c=mCount(k),t=SECQ[k].length,done=c===t,sc=S.endless||done?null:nextScn(k),nq=sc?scnQs(k,sc).filter(id=>!S.mastered[id]).length:0;
-  return `<button class="door sec${done?" done":""}" data-a="visit" data-v="${k}"><canvas class="cave" width="64" height="44" data-type="${done?"treasure":c?"elite":"fight"}" data-seed="${i*7+3}" aria-hidden="true"></canvas><strong>${esc(n)}</strong><small class="label">Midterm ${k[0]} · Section ${k[2]}</small><small class="mods">${sc?`Scenario: ${esc(SCN[sc].title)}`:secMods(k).join(" · ")}</small><span class="mbar"><i style="width:${c/t*100}%"></i></span><small class="${done?"good":""}">${S.endless?`1 random scenario · <span class="bad">−${hitOf(k)} HP</span> if wrong`:done?"Mastered · review":`${nq} question${nq===1?"":"s"} · ${scnLeft(k)} of ${SCNS[k].length} scenarios left · <span class="bad">−${hitOf(k)} HP</span>`}</small></button>`;
+  return `<button class="door sec${done?" done":""}" data-a="visit" data-v="${k}"><canvas class="cave" width="64" height="44" data-type="${done?"treasure":c?"elite":"fight"}" data-seed="${i*7+3}" aria-hidden="true"></canvas><strong>${esc(n)}</strong><small class="label">Set ${k[0]} · Round ${k[2]}</small><small class="mods">${sc?`Scenario: ${esc(SCN[sc].title)}`:secMods(k).join(" · ")}</small><span class="mbar"><i style="width:${c/t*100}%"></i></span><small class="${done?"good":""}">${S.endless?`1 random scenario · <span class="bad">−${hitOf(k)} HP</span> if wrong`:done?"Mastered · review":`${nq} question${nq===1?"":"s"} · ${scnLeft(k)} of ${SCNS[k].length} scenarios left · <span class="bad">−${hitOf(k)} HP</span>`}</small></button>`;
 }
 function mapView(){
   const o=offer(),all=!o.length,ms=SECS.filter(secDone).length;
   if(S.endless)return `<section class="room"><div><p class="label">Endless challenge · ${S.endless.visits} visitor${S.endless.visits===1?"":"s"} cleared</p><h2 class="ph">Two visitors are waiting</h2>
-    <p class="muted small">Everything is mastered. Now each visitor brings one random scenario from their section, hits a little harder as you go, and there are no revives. Fall and your run ends.</p></div>
+    <p class="muted small">Everything is mastered. Now each visitor brings one random scenario from their round, hits a little harder as you go, and there are no revives. Fall and your run ends.</p></div>
     <div class="doors n2 secs">${o.map(doorCard).join("")}</div>
+    ${S.side?`<p class="label mhead">Side rooms · pick one</p><div class="doors n2 secs side"><button class="door sec" data-a="side" data-v="rest"><canvas class="cave" width="64" height="44" data-type="rest" data-seed="5" aria-hidden="true"></canvas><strong>Healing Stone</strong><small>Recover ${Math.round(STONE_HEAL*100)}% of your max HP</small></button><button class="door sec" data-a="side" data-v="reliq"><canvas class="cave" width="64" height="44" data-type="treasure" data-seed="9" aria-hidden="true"></canvas><strong>Reliquary</strong><small>Choose a relic or potions</small></button></div><p class="muted small">The side rooms close after you use one and reopen after another visit.</p>`:""}
     <div class="mapstat"><span class="label">Right in endless</span><span class="num">${S.endless.right}</span></div></section>`;
-  return `<section class="room"><div><p class="label">Midterm ${o.length?o[0][0]:"–"} · ${ms}/12 sections mastered</p><h2 class="ph">${all?"Every visitor is satisfied":o.length===1?"One visitor left":"Two visitors are waiting"}</h2>
-    <p class="muted small">${all?"You've mastered all 12 sections. Open See all to review any of them.":`Each visitor brings one scenario at a time from their section of Midterm ${o.length?o[0][0]:""}. Finish this midterm and the next midterm's visitors arrive. Mastering questions raises your max HP.`}</p></div>
+  return `<section class="room"><div><p class="label">Set ${o.length?o[0][0]:"–"} · ${ms}/12 rounds mastered</p><h2 class="ph">${all?"Every visitor is satisfied":o.length===1?"One visitor left":"Two visitors are waiting"}</h2>
+    <p class="muted small">${all?"You've mastered all 12 rounds. Open See all to review any of them.":`Each visitor brings one scenario at a time from their round of Set ${o.length?o[0][0]:""}. Master this set and the next set's visitors arrive. Mastering questions raises your max HP.`}</p></div>
     ${all?"":`<div class="doors n2 secs">${o.map(doorCard).join("")}</div>`}
+    ${S.side?`<p class="label mhead">Side rooms · pick one</p><div class="doors n2 secs side"><button class="door sec" data-a="side" data-v="rest"><canvas class="cave" width="64" height="44" data-type="rest" data-seed="5" aria-hidden="true"></canvas><strong>Healing Stone</strong><small>Recover ${Math.round(STONE_HEAL*100)}% of your max HP</small></button><button class="door sec" data-a="side" data-v="reliq"><canvas class="cave" width="64" height="44" data-type="treasure" data-seed="9" aria-hidden="true"></canvas><strong>Reliquary</strong><small>Choose a relic or potions</small></button></div><p class="muted small">The side rooms close after you use one and reopen after another visit.</p>`:""}
     <div class="mapstat"><span class="label">Mastery</span><span class="mbar wide"><i style="width:${totalM()/MQ.length*100}%"></i></span><span class="num">${totalM()}/${MQ.length}</span></div></section>`;
 }
 function scnBlock(q){
@@ -1127,13 +1157,16 @@ function battleView(){
     <div class="answers list">${opts}</div>
   </section>`;
 }
+function reliqView(){
+  const opts=(S.reliq||[]).map(id=>{const l=LOOT.find(x=>x.id===id),k=l.item?0:cnt(id);
+    return `<button class="reward" data-a="loot" data-v="${id}">${ico(id)}<span class="rtx"><strong>${esc(l.n)}</strong><span class="label">${l.item?`Item · ${S.potions} in pack`:l.max===Infinity?(k?`Relic · ${k} owned, no limit`:"Relic · no limit"):k?`Relic · ${k} of ${l.max}`:`Relic · stacks to ${l.max}`}</span><span class="muted">${esc(l.d)}</span></span></button>`}).join("");
+  return `<section class="room page"><p class="label">Side room</p><h2 class="ph">A dusty reliquary</h2><p class="muted small">Choose one to keep.</p><div class="rewards">${opts||`<p class="muted">It's empty. You've collected everything it can hold.</p>`}</div></section>`;
+}
 function clearView(){
   const V=S.visit,[n,g]=VIS[V.k],c=mCount(V.k),t=SECQ[V.k].length;
-  const loot=(V.loot||[]).map(id=>{const l=LOOT.find(x=>x.id===id),k=l.item?0:cnt(id),took=V.took===id,off=V.took&&!took;
-    return `<button class="reward${took?" took":""}" data-a="loot" data-v="${id}" ${V.took?"disabled":""} style="${off?"opacity:.4":""}">${ico(id)}<span class="rtx"><strong>${esc(l.n)}</strong><span class="label">${took?"Taken":l.item?`Item · ${S.potions} in pack`:k?`Relic · ${k} of ${l.max}`:`Relic · stacks to ${l.max}`}</span><span class="muted">${esc(l.d)}</span></span></button>`}).join("");
   return `<section class="room page"><div class="foe one"><div class="sigil" aria-hidden="true">${g}</div><div class="foe-name">${esc(n)}</div><span class="num">${V.right}/${V.queue.length}</span></div>
-    <p class="muted small">${V.endless?`Endless visitors cleared: ${S.endless.visits}.`:secDone(V.k)?"Section mastered!":`${c} of ${t} questions in this section mastered, ${scnLeft(V.k)} scenario${scnLeft(V.k)===1?"":"s"} to go.`}${V.grow?` +${V.grow} max HP.`:""}</p>
-    ${loot?`<p class="label">${V.took?"Loot":"They left something behind. Take one"}</p><div class="rewards">${loot}</div>`:""}
+    <p class="muted small">${V.endless?`Endless visitors cleared: ${S.endless.visits}.`:secDone(V.k)?"Round mastered!":`${c} of ${t} questions in this round mastered, ${scnLeft(V.k)} scenario${scnLeft(V.k)===1?"":"s"} to go.`}${V.grow?` +${V.grow} max HP.`:""}</p>
+    ${S.side?`<p class="muted small">A healing stone and a reliquary have opened up beside the passages. You'll find them on the way back.</p>`:""}
     ${V.missed.length?`<p class="label">${V.endless?"Missed this visit":"They'll ask these again"}</p><div class="review">${V.missed.map(id=>{const q=QBY[id];return `<div><p>${q.q}</p><p class="good">${q.ok.map(i=>esc(q.opts[i][0])).join("; ")}</p></div>`}).join("")}</div>`:""}
   </section>`;
 }
@@ -1156,8 +1189,8 @@ const fmtD=t=>new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric
 function titleView(){
   const runs=loadRuns(),tm=totalM(),fresh0=!S.asked;
   return `<section class="room title"><p class="label">Expert level · Intro to Analytics</p><h1 class="tagline">The Analytics Conungeon</h1>
-    <p class="muted">Twelve visitors, one for each midterm section, have pulled up chairs. Master every question to satisfy them all. Until you do, you can revive as often as you need. Once everything is mastered, the endless challenge begins, and one fall ends your run.</p>
-    ${fresh0?"":`<div class="stats"><div><span class="label">Mastered</span><span class="num">${tm}/${MQ.length}</span></div><div><span class="label">${S.endless?"Endless cleared":"Sections"}</span><span class="num">${S.endless?S.endless.visits:`${SECS.filter(secDone).length}/12`}</span></div><div><span class="label">Revives</span><span class="num">${S.revives}</span></div></div>`}
+    <p class="muted">Twelve visitors, one for each round of the three practice sets, have pulled up chairs. Master every question to satisfy them all. Until you do, you can revive as often as you need. Once everything is mastered, the endless challenge begins, and one fall ends your run.</p>
+    ${fresh0?"":`<div class="stats"><div><span class="label">Mastered</span><span class="num">${tm}/${MQ.length}</span></div><div><span class="label">${S.endless?"Endless cleared":"Rounds"}</span><span class="num">${S.endless?S.endless.visits:`${SECS.filter(secDone).length}/12`}</span></div><div><span class="label">Revives</span><span class="num">${S.revives}</span></div></div>`}
     <details class="past"><summary><span>Past runs</span><span class="muted">${runs.length?runs.length:"none yet"}</span></summary>${runs.length?`<ol class="floors runs">${runs.map((r,i)=>`<li><span class="num">${runs.length-i}</span><span>${fmtD(r.end)} · cleared ${r.visits} endless visitor${r.visits===1?"":"s"}, ${r.right} right<br><span class="muted small">Accuracy ${r.asked?Math.round(r.correct/r.asked*100):0}% · best streak ${r.best} · ${r.revives} revive${r.revives===1?"":"s"} while learning · max HP ${r.maxHp} · ended by ${esc(r.by)}</span></span></li>`).join("")}</ol>`:`<p class="muted small">Runs are recorded when the endless challenge finally knocks you out.</p>`}</details>
   </section>`;
 }
@@ -1171,11 +1204,10 @@ function sheetView(){
     <div class="stats"><div><span class="label">Mastered</span><span class="num">${totalM()}/${MQ.length}</span></div><div><span class="label">Accuracy</span><span class="num">${acc}%</span></div><div><span class="label">Streak</span><span class="num">${S.streak} <small class="muted">best ${S.bestStreak}</small></span></div></div>
     <p class="label">Expert gear · always on</p>
     <ul class="rlist"><li>${ico("pendant")}<div><strong>Heart pendant${V&&!V.pendant?" · used":""}</strong><span class="muted">Once per visitor, survive a knockout with 1 HP.</span></div></li>
-      <li>${ico("pocket")}<div><strong>Pocket watch${V&&S.watch?" · used":""}</strong><span class="muted">When time runs out, +${WATCH_T}s once per question. Unused time carries to the next part of the same scenario.</span></div></li>
-      <li>${ico("potion")}<div><strong>Potions × ${S.potions}</strong><span class="muted">Visitors sometimes drop them. You drink one automatically when your health falls below a third. Each heals ${Math.round(POTION*100)}% of your max HP.</span></div></li>
+      <li>${ico("pocket")}<div><strong>Exam clock</strong><span class="muted">90 seconds per question, plus 60 seconds to read a scenario's first question. Nothing adds time, but unused time carries to the next question in the same scenario, like budgeting time on a real test.</span></div></li>      <li>${ico("potion")}<div><strong>Potions × ${S.potions}</strong><span class="muted">Found in reliquaries. You drink one automatically when your health falls below a third. Each heals ${Math.round(POTION*100)}% of your max HP.</span></div></li>
       <li>${ico("heart")}<div><strong>Health ${Math.max(0,S.hp)}/${S.maxHp}</strong><span class="muted">Right answers heal ${rightHeal()} HP (${Math.round((HEAL_RIGHT+.01*cnt("ember"))*100)}% of max); three in a row heals ${windHeal()} more (${Math.round((SECOND_WIND+.1*cnt("ink"))*100)}%). Each newly mastered question adds 1% max HP. Revives: ${S.revives}.</span></div></li></ul>
     <p class="label">Loot</p>${rel?`<ul class="rlist">${rel}</ul>`:`<p class="muted small">Nothing yet. Every visitor leaves something behind when they go.</p>`}
-    <p class="label">All sections${busy?"":" · tap one to face it"}</p><div class="seclist">${SECS.map((k,i)=>`<button class="secrow${secDone(k)?" good":""}" data-a="visit" data-v="${k}" ${busy?"disabled":""}><span class="num">${k[0]}·${k[2]}</span><span class="nm">${esc(VIS[k][0])}</span><span class="muted">${mCount(k)}/${SECQ[k].length}</span></button>`).join("")}</div>
+    <p class="label">All rounds${busy?"":" · tap one to face it"}</p><div class="seclist">${SECS.map((k,i)=>`<button class="secrow${secDone(k)?" good":""}" data-a="visit" data-v="${k}" ${busy?"disabled":""}><span class="num">${k[0]}·${k[2]}</span><span class="nm">${esc(VIS[k][0])}</span><span class="muted">${mCount(k)}/${SECQ[k].length}</span></button>`).join("")}</div>
     ${weak.length?`<p class="label">Missed most, not yet mastered</p><div class="review">${weak.map(x=>`<div><p>${x.q.q}</p><p class="good">${x.q.ok.map(i=>esc(x.q.opts[i][0])).join("; ")}</p><p class="muted small">Missed ${x.n}×</p></div>`).join("")}</div>`:""}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${confirmReset?`<span class="muted">Erase all mastery and loot?</span><button class="btn" data-a="resetok">Erase</button><button class="btn ghost" data-a="resetno">Keep</button>`:`<button class="btn ghost" data-a="reset">Reset progress</button><button class="btn ghost" data-a="title">Title page</button><a class="btn ghost" href="index.html">Trivia Conungeon</a>`}</div>
   </div></div>`;
@@ -1193,6 +1225,7 @@ function footer(){
     if(asking)nav=(q.multi?`<button class="btn right" data-a="submit" ${S.sel.length?"":"disabled"}>Submit</button>`:`<button class="btn right" disabled>Next question</button>`);
     else nav=`<button class="btn right" data-a="next" id="nextbtn">${S.hp<=0?"Fall":V.i+1>=V.queue.length?"Finish visit":"Next question"}</button>`}
   else if(S.screen==="clear")nav=`<button class="btn right" data-a="map">Next visitors</button>`;
+  else if(S.screen==="reliq")nav=`<button class="btn ghost" data-a="leavereliq">Not now</button>`;
   else if(S.screen==="final")nav=`<button class="btn right" data-a="title">Title page</button>`;
   else if(S.screen==="faint")nav=`<button class="btn ghost" data-a="map">‹ Leave</button><button class="btn right" data-a="revive" id="nextbtn">Revive</button>`;
   // while a question is open, the log box folds away to give the question the room
@@ -1200,7 +1233,7 @@ function footer(){
 }
 function render(top){
   const app=$("#app"),old=app.querySelector(".mid"),y=old&&!top?old.scrollTop:0;
-  const body=onTitle?titleView():S.screen==="map"?mapView():S.screen==="battle"?battleView():S.screen==="clear"?clearView():S.screen==="final"?finalView():faintView();
+  const body=onTitle?titleView():S.screen==="map"?mapView():S.screen==="battle"?battleView():S.screen==="clear"?clearView():S.screen==="reliq"?reliqView():S.screen==="final"?finalView():faintView();
   app.className="run"+(onTitle?" titlepage":S.screen==="battle"?" action":"");
   app.innerHTML=(onTitle?"":sheetView()+hud())+`<main class="mid">${body}</main>`+footer();
   const m=app.querySelector(".mid");if(m)m.scrollTop=y;
@@ -1215,6 +1248,8 @@ document.addEventListener("click",ev=>{
   else if(a==="next")nextQ();
   else if(a==="visit")startVisit(b.dataset.v);
   else if(a==="loot")takeLoot(b.dataset.v);
+  else if(a==="side")openSide(b.dataset.v);
+  else if(a==="leavereliq"){S.screen="map";S.reliq=null;render(true)}
   else if(a==="map"||a==="leave"){stopTimer();if(a==="leave"&&S.screen==="battle"){say(`You step away from ${VIS[S.visit.k][0]}. Your mastered answers are saved.`)}S.screen="map";S.visit=null;save();render(true)}
   else if(a==="revive")revive();
   else if(a==="enter"){onTitle=false;render(true);if(S.screen==="battle"&&S.phase==="ask")startTimer()}
