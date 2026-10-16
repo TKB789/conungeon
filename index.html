@@ -1255,7 +1255,7 @@ function recordRun(win,left){
 }
 // Base camps: each one is its own Conungeon. Add entries here as new camps open (listed:false keeps a camp off the list).
 const CAMPS=[{id:"trivia",n:"The Conungeon Base Camp",d:"General trivia across eight subjects. Reach floor 100 to face the Super Computaur.",href:null,listed:true},
-  {id:"analytics",n:"The Analytics Conungeon",d:"Expert-level midterm practice for Intro to Analytics.",href:"analytics.html",listed:false}];
+  {id:"analytics",n:"The Analytics Conungeon",d:"Expert-level practice in analytics and modeling.",href:"analytics.html",listed:false}];
 function campsView(){
   const ring=(()=>{try{return !!localStorage.getItem("conungeon-trophy")}catch(e){return false}})();
   const li=CAMPS.filter(c=>c.listed||(c.ring&&ring)).map(c=>`<li>${ico("bless")}<div><strong>${esc(c.n)}</strong><span class="muted">${esc(c.d)}${c.href?"":" · You're here"}</span></div>${c.href?`<a class="btn" href="${c.href}">Go</a>`:""}</li>`).join("");
